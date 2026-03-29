@@ -18,10 +18,26 @@ public final class WynnHorseKeyMappings {
             CATEGORY
     );
 
+    public static final KeyMapping OPEN_WAYPOINT_MANAGER = new KeyMapping(
+            "key.wynnhorse.open_waypoint_manager",
+            InputConstants.Type.KEYSYM,
+            InputConstants.KEY_O,
+            CATEGORY
+    );
+
+    public static final KeyMapping ADD_CURRENT_WAYPOINT = new KeyMapping(
+            "key.wynnhorse.add_current_waypoint",
+            InputConstants.Type.KEYSYM,
+            InputConstants.KEY_P,
+            CATEGORY
+    );
+
     private WynnHorseKeyMappings() {
     }
 
     public static void register(final RegisterKeyMappingsEvent event) {
         event.register(TOGGLE_AUTOMATION);
+        event.register(OPEN_WAYPOINT_MANAGER);
+        event.register(ADD_CURRENT_WAYPOINT);
     }
 }
