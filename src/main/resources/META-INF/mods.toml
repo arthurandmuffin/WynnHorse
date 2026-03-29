@@ -1,0 +1,36 @@
+# See https://docs.minecraftforge.net/en/1.21.x/gettingstarted/modfiles/#modstoml
+# There are lots of things you can do with the mods.toml, and not all fields are included with this MDK
+# References: https://github.com/MinecraftForge/MDKExamples
+
+modLoader="javafml"
+loaderVersion="[62,)"
+license="All Rights Reserved"
+#issueTrackerURL="https://github.com/MyOrganization/MyMod/" #optional
+clientSideOnly=true
+
+[[mods]]
+modId="wynnhorse"
+version="1.0.0"
+displayName="WynnHorse"
+#updateJSONURL="https://example.com/updates.json" #optional
+#displayURL="https://example.com/" #optional
+#logoFile="examplemod.png" #optional
+#credits="" #optional
+authors="Arthur Huang" #optional
+#displayTest="MATCH_VERSION" #optional, default=MATCH_VERSION when not clientSideOnly, else IGNORE_ALL_VERSION
+
+description='''Client-side waypoint and horse automation mod for ordered route riding.'''
+
+[[dependencies.wynnhorse]] #recommended
+    modId="forge"
+    mandatory=true
+    versionRange="[62,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.wynnhorse]] #recommended
+    modId="minecraft"
+    mandatory=true
+    versionRange="[26.1,26.2,)"
+    ordering="NONE"
+    side="BOTH"
