@@ -36,8 +36,30 @@ public final class NavigationController {
 
         Waypoint nextWaypoint = this.resolveNextWaypoint(waypoints, activeIndex);
         Vec3 steeringTarget = this.resolveSteeringTarget(player.position(), waypoint.position(), nextWaypoint == null ? null : nextWaypoint.position());
-        this.steerPlayer(player, steeringTarget);
+        this.steerPlayer(player, steeringTarget, WynnHorseConfig.getSteeringYawStepDegrees());
         return NavigationOutcome.navigating(waypoint);
+    }
+
+    public DirectNavigationOutcome tickTowardsPosition(final Minecraft minecraft, final Vec3 targetPosition, final double reachDistance) {
+        return this.tickTowardsPosition(minecraft, targetPosition, reachDistance, WynnHorseConfig.getSteeringYawStepDegrees());
+    }
+
+    public DirectNavigationOutcome tickTowardsPosition(final Minecraft minecraft, final Vec3 targetPosition, final double reachDistance, final double yawStepDegrees) {
+        if (minecraft.screen != null) {
+            return DirectNavigationOutcome.paused();
+        }
+
+        LocalPlayer player = minecraft.player;
+        if (player == null || targetPosition == null) {
+            return DirectNavigationOutcome.noTarget();
+        }
+
+        if (horizontalDistance(player.position(), targetPosition) <= reachDistance) {
+            return DirectNavigationOutcome.reached();
+        }
+
+        this.steerPlayer(player, targetPosition, yawStepDegrees);
+        return DirectNavigationOutcome.navigating();
     }
 
     private Waypoint resolveNextWaypoint(final List<Waypoint> waypoints, final int activeIndex) {
@@ -78,7 +100,7 @@ public final class NavigationController {
         return playerPosition.add(normalizedBlendedDirection.scale(projectionDistance));
     }
 
-    private void steerPlayer(final LocalPlayer player, final Vec3 waypointPosition) {
+    private void steerPlayer(final LocalPlayer player, final Vec3 waypointPosition, final double yawStepDegrees) {
         Vec3 playerPosition = player.position();
         double deltaX = waypointPosition.x - playerPosition.x;
         double deltaZ = waypointPosition.z - playerPosition.z;
@@ -87,7 +109,7 @@ public final class NavigationController {
         }
 
         float desiredYaw = (float) Math.toDegrees(Mth.atan2(deltaZ, deltaX)) - 90.0F;
-        float updatedYaw = Mth.approachDegrees(player.getYRot(), desiredYaw, (float) WynnHorseConfig.getSteeringYawStepDegrees());
+        float updatedYaw = Mth.approachDegrees(player.getYRot(), desiredYaw, (float) yawStepDegrees);
         player.setYRot(updatedYaw);
         player.setYHeadRot(updatedYaw);
         player.setYBodyRot(updatedYaw);
@@ -121,6 +143,24 @@ public final class NavigationController {
 
         public static NavigationOutcome noTarget() {
             return new NavigationOutcome(Status.NO_TARGET, null);
+        }
+    }
+
+    public record DirectNavigationOutcome(Status status) {
+        public static DirectNavigationOutcome navigating() {
+            return new DirectNavigationOutcome(Status.NAVIGATING);
+        }
+
+        public static DirectNavigationOutcome reached() {
+            return new DirectNavigationOutcome(Status.REACHED);
+        }
+
+        public static DirectNavigationOutcome paused() {
+            return new DirectNavigationOutcome(Status.PAUSED);
+        }
+
+        public static DirectNavigationOutcome noTarget() {
+            return new DirectNavigationOutcome(Status.NO_TARGET);
         }
     }
 

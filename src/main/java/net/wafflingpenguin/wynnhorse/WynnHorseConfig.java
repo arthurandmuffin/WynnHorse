@@ -32,6 +32,82 @@ public final class WynnHorseConfig {
             .comment("Distance from a waypoint where steering may begin blending toward the next waypoint.")
             .defineInRange("waypointCornerRadius", 6.0D, 0.5D, 32.0D);
 
+    private static final ForgeConfigSpec.DoubleValue HORSE_SPAWN_DETECTION_RADIUS = BUILDER
+            .comment("Radius in blocks used to search for a newly spawned horse after using the selected horse item.")
+            .defineInRange("horseSpawnDetectionRadius", 10.0D, 2.0D, 48.0D);
+
+    private static final ForgeConfigSpec.IntValue HORSE_SPAWN_DETECTION_TIMEOUT_TICKS = BUILDER
+            .comment("How many client ticks to wait for a spawned horse to appear before failing the spawn step.")
+            .defineInRange("horseSpawnDetectionTimeoutTicks", 30, 5, 200);
+
+    private static final ForgeConfigSpec.IntValue HORSE_SPAWN_RETRY_DELAY_TICKS = BUILDER
+            .comment("How many ticks to wait after a failed horse detection before retrying another spawn attempt.")
+            .defineInRange("horseSpawnRetryDelayTicks", 24, 1, 200);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_SPAWN_LOOK_PITCH_DEGREES = BUILDER
+            .comment("Target pitch in degrees used before attempting to spawn the horse. Positive values look downward.")
+            .defineInRange("horseSpawnLookPitchDegrees", 85.0D, 10.0D, 90.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_SPAWN_LOOK_PITCH_STEP_DEGREES = BUILDER
+            .comment("Maximum pitch change per tick while turning downward before attempting to spawn the horse.")
+            .defineInRange("horseSpawnLookPitchStepDegrees", 12.0D, 0.25D, 45.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_NEARBY_REUSE_RADIUS = BUILDER
+            .comment("Maximum distance for reusing a nearby horse when exact named-horse matching is unavailable.")
+            .defineInRange("horseNearbyReuseRadius", 4.0D, 1.0D, 16.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_MOUNT_RANGE = BUILDER
+            .comment("Distance in blocks considered close enough to attempt mounting a detected horse.")
+            .defineInRange("horseMountRange", 2.0D, 0.5D, 6.0D);
+
+    private static final ForgeConfigSpec.IntValue HORSE_MOUNT_RETRY_COOLDOWN_TICKS = BUILDER
+            .comment("Ticks to wait between repeated mount interaction attempts.")
+            .defineInRange("horseMountRetryCooldownTicks", 10, 1, 100);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_APPROACH_YAW_STEP_DEGREES = BUILDER
+            .comment("Maximum yaw change per tick while turning toward a detected horse before mounting.")
+            .defineInRange("horseApproachYawStepDegrees", 2.0D, 0.25D, 20.0D);
+
+    private static final ForgeConfigSpec.IntValue HORSE_APPROACH_PAUSE_TICKS = BUILDER
+            .comment("Ticks to pause briefly after horse detection before beginning the mount approach.")
+            .defineInRange("horseApproachPauseTicks", 10, 0, 100);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_POST_MOUNT_OVERSHOOT_YAW_STEP_DEGREES = BUILDER
+            .comment("Maximum yaw change per tick during the initial overshoot leg of the post-mount pivot.")
+            .defineInRange("horsePostMountOvershootYawStepDegrees", 30.0D, 0.25D, 90.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_POST_MOUNT_CORRECTION_YAW_STEP_DEGREES = BUILDER
+            .comment("Maximum yaw change per tick during the correction leg of the post-mount pivot.")
+            .defineInRange("horsePostMountCorrectionYawStepDegrees", 18.0D, 0.25D, 90.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_POST_MOUNT_FACING_TOLERANCE_DEGREES = BUILDER
+            .comment("Yaw error tolerance in degrees considered close enough to begin movement after mounting.")
+            .defineInRange("horsePostMountFacingToleranceDegrees", 3.0D, 0.5D, 45.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_POST_MOUNT_OVERSHOOT_MIN_DEGREES = BUILDER
+            .comment("Minimum yaw overshoot in degrees for the post-mount snap turn before correcting back toward the waypoint.")
+            .defineInRange("horsePostMountOvershootMinDegrees", 4.0D, 0.0D, 45.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_POST_MOUNT_OVERSHOOT_MAX_DEGREES = BUILDER
+            .comment("Maximum yaw overshoot in degrees for the post-mount snap turn before correcting back toward the waypoint.")
+            .defineInRange("horsePostMountOvershootMaxDegrees", 10.0D, 0.0D, 60.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_POST_MOUNT_PITCH_STEP_DEGREES = BUILDER
+            .comment("Maximum pitch change per tick during the post-mount snap turn.")
+            .defineInRange("horsePostMountPitchStepDegrees", 2.25D, 0.1D, 15.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_POST_MOUNT_PITCH_TOLERANCE_DEGREES = BUILDER
+            .comment("Pitch error tolerance in degrees for completing the post-mount snap turn.")
+            .defineInRange("horsePostMountPitchToleranceDegrees", 0.9D, 0.1D, 10.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_POST_MOUNT_PITCH_JITTER_MIN_DEGREES = BUILDER
+            .comment("Minimum pitch deviation in degrees used for the randomized post-mount snap turn animation.")
+            .defineInRange("horsePostMountPitchJitterMinDegrees", 0.75D, 0.0D, 15.0D);
+
+    private static final ForgeConfigSpec.DoubleValue HORSE_POST_MOUNT_PITCH_JITTER_MAX_DEGREES = BUILDER
+            .comment("Maximum pitch deviation in degrees used for the randomized post-mount snap turn animation.")
+            .defineInRange("horsePostMountPitchJitterMaxDegrees", 3.0D, 0.0D, 20.0D);
+
     private static final ForgeConfigSpec.ConfigValue<String> WAYPOINT_RENDER_STYLE = BUILDER
             .comment("Render style used for waypoint visualization. Valid values: marker, beacon.")
             .define("waypointRenderStyle", WaypointRenderStyle.MARKER.serializedName());
@@ -58,6 +134,25 @@ public final class WynnHorseConfig {
     public static double waypointReachedDistance = WAYPOINT_REACHED_DISTANCE.get();
     public static double steeringYawStepDegrees = STEERING_YAW_STEP_DEGREES.get();
     public static double waypointCornerRadius = WAYPOINT_CORNER_RADIUS.get();
+    public static double horseSpawnDetectionRadius = HORSE_SPAWN_DETECTION_RADIUS.get();
+    public static int horseSpawnDetectionTimeoutTicks = HORSE_SPAWN_DETECTION_TIMEOUT_TICKS.get();
+    public static int horseSpawnRetryDelayTicks = HORSE_SPAWN_RETRY_DELAY_TICKS.get();
+    public static double horseSpawnLookPitchDegrees = HORSE_SPAWN_LOOK_PITCH_DEGREES.get();
+    public static double horseSpawnLookPitchStepDegrees = HORSE_SPAWN_LOOK_PITCH_STEP_DEGREES.get();
+    public static double horseNearbyReuseRadius = HORSE_NEARBY_REUSE_RADIUS.get();
+    public static double horseMountRange = HORSE_MOUNT_RANGE.get();
+    public static int horseMountRetryCooldownTicks = HORSE_MOUNT_RETRY_COOLDOWN_TICKS.get();
+    public static double horseApproachYawStepDegrees = HORSE_APPROACH_YAW_STEP_DEGREES.get();
+    public static int horseApproachPauseTicks = HORSE_APPROACH_PAUSE_TICKS.get();
+    public static double horsePostMountOvershootYawStepDegrees = HORSE_POST_MOUNT_OVERSHOOT_YAW_STEP_DEGREES.get();
+    public static double horsePostMountCorrectionYawStepDegrees = HORSE_POST_MOUNT_CORRECTION_YAW_STEP_DEGREES.get();
+    public static double horsePostMountFacingToleranceDegrees = HORSE_POST_MOUNT_FACING_TOLERANCE_DEGREES.get();
+    public static double horsePostMountOvershootMinDegrees = HORSE_POST_MOUNT_OVERSHOOT_MIN_DEGREES.get();
+    public static double horsePostMountOvershootMaxDegrees = HORSE_POST_MOUNT_OVERSHOOT_MAX_DEGREES.get();
+    public static double horsePostMountPitchStepDegrees = HORSE_POST_MOUNT_PITCH_STEP_DEGREES.get();
+    public static double horsePostMountPitchToleranceDegrees = HORSE_POST_MOUNT_PITCH_TOLERANCE_DEGREES.get();
+    public static double horsePostMountPitchJitterMinDegrees = HORSE_POST_MOUNT_PITCH_JITTER_MIN_DEGREES.get();
+    public static double horsePostMountPitchJitterMaxDegrees = HORSE_POST_MOUNT_PITCH_JITTER_MAX_DEGREES.get();
     public static WaypointRenderStyle waypointRenderStyle = WaypointRenderStyle.fromSerializedName(WAYPOINT_RENDER_STYLE.get());
     public static String waypointBeaconColor = readHexColor(WAYPOINT_BEACON_COLOR.get(), DEFAULT_WAYPOINT_BEACON_COLOR);
     public static String activeWaypointBeaconColor = readHexColor(ACTIVE_WAYPOINT_BEACON_COLOR.get(), DEFAULT_ACTIVE_WAYPOINT_BEACON_COLOR);
@@ -77,6 +172,25 @@ public final class WynnHorseConfig {
         waypointReachedDistance = WAYPOINT_REACHED_DISTANCE.get();
         steeringYawStepDegrees = STEERING_YAW_STEP_DEGREES.get();
         waypointCornerRadius = WAYPOINT_CORNER_RADIUS.get();
+        horseSpawnDetectionRadius = HORSE_SPAWN_DETECTION_RADIUS.get();
+        horseSpawnDetectionTimeoutTicks = HORSE_SPAWN_DETECTION_TIMEOUT_TICKS.get();
+        horseSpawnRetryDelayTicks = HORSE_SPAWN_RETRY_DELAY_TICKS.get();
+        horseSpawnLookPitchDegrees = HORSE_SPAWN_LOOK_PITCH_DEGREES.get();
+        horseSpawnLookPitchStepDegrees = HORSE_SPAWN_LOOK_PITCH_STEP_DEGREES.get();
+        horseNearbyReuseRadius = HORSE_NEARBY_REUSE_RADIUS.get();
+        horseMountRange = HORSE_MOUNT_RANGE.get();
+        horseMountRetryCooldownTicks = HORSE_MOUNT_RETRY_COOLDOWN_TICKS.get();
+        horseApproachYawStepDegrees = HORSE_APPROACH_YAW_STEP_DEGREES.get();
+        horseApproachPauseTicks = HORSE_APPROACH_PAUSE_TICKS.get();
+        horsePostMountOvershootYawStepDegrees = HORSE_POST_MOUNT_OVERSHOOT_YAW_STEP_DEGREES.get();
+        horsePostMountCorrectionYawStepDegrees = HORSE_POST_MOUNT_CORRECTION_YAW_STEP_DEGREES.get();
+        horsePostMountFacingToleranceDegrees = HORSE_POST_MOUNT_FACING_TOLERANCE_DEGREES.get();
+        horsePostMountOvershootMinDegrees = HORSE_POST_MOUNT_OVERSHOOT_MIN_DEGREES.get();
+        horsePostMountOvershootMaxDegrees = HORSE_POST_MOUNT_OVERSHOOT_MAX_DEGREES.get();
+        horsePostMountPitchStepDegrees = HORSE_POST_MOUNT_PITCH_STEP_DEGREES.get();
+        horsePostMountPitchToleranceDegrees = HORSE_POST_MOUNT_PITCH_TOLERANCE_DEGREES.get();
+        horsePostMountPitchJitterMinDegrees = HORSE_POST_MOUNT_PITCH_JITTER_MIN_DEGREES.get();
+        horsePostMountPitchJitterMaxDegrees = HORSE_POST_MOUNT_PITCH_JITTER_MAX_DEGREES.get();
         waypointRenderStyle = WaypointRenderStyle.fromSerializedName(WAYPOINT_RENDER_STYLE.get());
         waypointBeaconColor = syncLoadedHexColor(WAYPOINT_BEACON_COLOR, DEFAULT_WAYPOINT_BEACON_COLOR);
         activeWaypointBeaconColor = syncLoadedHexColor(ACTIVE_WAYPOINT_BEACON_COLOR, DEFAULT_ACTIVE_WAYPOINT_BEACON_COLOR);
@@ -107,6 +221,82 @@ public final class WynnHorseConfig {
 
     public static double getWaypointCornerRadius() {
         return waypointCornerRadius;
+    }
+
+    public static double getHorseSpawnDetectionRadius() {
+        return horseSpawnDetectionRadius;
+    }
+
+    public static int getHorseSpawnDetectionTimeoutTicks() {
+        return horseSpawnDetectionTimeoutTicks;
+    }
+
+    public static int getHorseSpawnRetryDelayTicks() {
+        return horseSpawnRetryDelayTicks;
+    }
+
+    public static double getHorseSpawnLookPitchDegrees() {
+        return horseSpawnLookPitchDegrees;
+    }
+
+    public static double getHorseSpawnLookPitchStepDegrees() {
+        return horseSpawnLookPitchStepDegrees;
+    }
+
+    public static double getHorseNearbyReuseRadius() {
+        return horseNearbyReuseRadius;
+    }
+
+    public static double getHorseMountRange() {
+        return horseMountRange;
+    }
+
+    public static int getHorseMountRetryCooldownTicks() {
+        return horseMountRetryCooldownTicks;
+    }
+
+    public static double getHorseApproachYawStepDegrees() {
+        return horseApproachYawStepDegrees;
+    }
+
+    public static int getHorseApproachPauseTicks() {
+        return horseApproachPauseTicks;
+    }
+
+    public static double getHorsePostMountOvershootYawStepDegrees() {
+        return horsePostMountOvershootYawStepDegrees;
+    }
+
+    public static double getHorsePostMountCorrectionYawStepDegrees() {
+        return horsePostMountCorrectionYawStepDegrees;
+    }
+
+    public static double getHorsePostMountFacingToleranceDegrees() {
+        return horsePostMountFacingToleranceDegrees;
+    }
+
+    public static double getHorsePostMountOvershootMinDegrees() {
+        return horsePostMountOvershootMinDegrees;
+    }
+
+    public static double getHorsePostMountOvershootMaxDegrees() {
+        return horsePostMountOvershootMaxDegrees;
+    }
+
+    public static double getHorsePostMountPitchStepDegrees() {
+        return horsePostMountPitchStepDegrees;
+    }
+
+    public static double getHorsePostMountPitchToleranceDegrees() {
+        return horsePostMountPitchToleranceDegrees;
+    }
+
+    public static double getHorsePostMountPitchJitterMinDegrees() {
+        return horsePostMountPitchJitterMinDegrees;
+    }
+
+    public static double getHorsePostMountPitchJitterMaxDegrees() {
+        return horsePostMountPitchJitterMaxDegrees;
     }
 
     public static void setWaypointRenderStyle(final WaypointRenderStyle style) {

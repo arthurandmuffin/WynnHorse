@@ -4,18 +4,25 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.wafflingpenguin.wynnhorse.automation.AutomationController;
 import net.wafflingpenguin.wynnhorse.client.gui.WaypointManagerScreen;
+import net.wafflingpenguin.wynnhorse.client.hud.HorseMatchOverlay;
 import net.wafflingpenguin.wynnhorse.client.render.WaypointRenderer;
+import net.wafflingpenguin.wynnhorse.horse.HorseItemTracker;
 import net.wafflingpenguin.wynnhorse.waypoint.Waypoint;
 import net.wafflingpenguin.wynnhorse.waypoint.WaypointStore;
+import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.event.TickEvent;
 
 public final class WynnHorseClient {
     private static final AutomationController AUTOMATION_CONTROLLER = new AutomationController();
+    private static final HorseItemTracker HORSE_ITEM_TRACKER = new HorseItemTracker();
     private static final WaypointStore WAYPOINT_STORE = new WaypointStore();
+    private static final int STATUS_MESSAGE_DURATION_TICKS = 20;
 
     private static boolean registered;
+    private static Component statusOverlayMessage;
+    private static int statusOverlayTicksRemaining;
 
     private WynnHorseClient() {
     }
@@ -27,6 +34,7 @@ public final class WynnHorseClient {
 
         registered = true;
         RegisterKeyMappingsEvent.BUS.addListener(WynnHorseKeyMappings::register);
+        CustomizeGuiOverlayEvent.Chat.BUS.addListener(HorseMatchOverlay::render);
         TickEvent.ClientTickEvent.Post.BUS.addListener(WynnHorseClient::onClientTick);
         ViewportEvent.ComputeCameraAngles.BUS.addListener(WaypointRenderer::collectWaypointGizmos);
     }
@@ -35,8 +43,28 @@ public final class WynnHorseClient {
         return WAYPOINT_STORE;
     }
 
+    public static HorseItemTracker getHorseItemTracker() {
+        return HORSE_ITEM_TRACKER;
+    }
+
+    public static Component getStatusOverlayMessage() {
+        return statusOverlayTicksRemaining > 0 ? statusOverlayMessage : null;
+    }
+
+    public static void showStatusOverlay(final Component message) {
+        statusOverlayMessage = message;
+        statusOverlayTicksRemaining = STATUS_MESSAGE_DURATION_TICKS;
+    }
+
     private static void onClientTick(final TickEvent.ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
+
+        if (statusOverlayTicksRemaining > 0) {
+            statusOverlayTicksRemaining--;
+            if (statusOverlayTicksRemaining == 0) {
+                statusOverlayMessage = null;
+            }
+        }
 
         while (WynnHorseKeyMappings.OPEN_WAYPOINT_MANAGER.consumeClick()) {
             if (minecraft.player == null || minecraft.level == null) {
@@ -52,7 +80,7 @@ public final class WynnHorseClient {
             }
 
             Waypoint waypoint = addCurrentWaypoint(minecraft);
-            minecraft.player.sendOverlayMessage(Component.translatable("message.wynnhorse.waypoint_added", waypoint.name()));
+            showStatusOverlay(Component.translatable("message.wynnhorse.waypoint_added", waypoint.name()));
         }
 
         while (WynnHorseKeyMappings.TOGGLE_AUTOMATION.consumeClick()) {
@@ -61,19 +89,23 @@ public final class WynnHorseClient {
             }
 
             if (!AUTOMATION_CONTROLLER.isEnabled() && WAYPOINT_STORE.route().getCurrentWaypoint().isEmpty()) {
-                minecraft.player.sendOverlayMessage(Component.translatable("message.wynnhorse.automation.no_target"));
+                showStatusOverlay(Component.translatable("message.wynnhorse.automation.no_target"));
                 continue;
             }
 
+            HORSE_ITEM_TRACKER.refresh(minecraft);
+
             boolean enabled = AUTOMATION_CONTROLLER.toggle(minecraft);
-            minecraft.player.sendOverlayMessage(
+            showStatusOverlay(
                     Component.translatable(enabled ? "message.wynnhorse.automation.enabled" : "message.wynnhorse.automation.disabled")
             );
         }
 
-        Component automationUpdate = AUTOMATION_CONTROLLER.tick(minecraft, WAYPOINT_STORE.route());
-        if (automationUpdate != null && minecraft.player != null) {
-            minecraft.player.sendOverlayMessage(automationUpdate);
+        HORSE_ITEM_TRACKER.refresh(minecraft);
+
+        Component automationUpdate = AUTOMATION_CONTROLLER.tick(minecraft, WAYPOINT_STORE.route(), HORSE_ITEM_TRACKER);
+        if (automationUpdate != null) {
+            showStatusOverlay(automationUpdate);
         }
     }
 
@@ -83,4 +115,5 @@ public final class WynnHorseClient {
         WAYPOINT_STORE.route().setActiveIndex(WAYPOINT_STORE.route().size() - 1);
         return waypoint;
     }
+
 }
