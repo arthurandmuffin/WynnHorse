@@ -29,12 +29,16 @@ public record HorseItemMatch(int slot, String displayName, String statName, Inte
         return this.hasParsedStat() && this.statValue.intValue() > 0 && this.statMaximum.intValue() > 1;
     }
 
-    public String timingText() {
+    public String timingText(final boolean useEtaLabel) {
         if (!this.hasTimingEstimate()) {
             return "";
         }
 
-        return "ETA: " + formatDurationMinutes(this.estimatedMinutesRemainingToMax()) + "   " + this.progressPercentText();
+        if (useEtaLabel) {
+            return "ETA: " + formatDurationMinutes(this.estimatedMinutesRemainingToMax()) + "   " + this.progressPercentText();
+        }
+
+        return "Progress: " + this.progressPercentText();
     }
 
     public double estimatedMinutesRemainingToMax() {

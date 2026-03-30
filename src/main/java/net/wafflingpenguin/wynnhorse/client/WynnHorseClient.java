@@ -47,6 +47,10 @@ public final class WynnHorseClient {
         return HORSE_ITEM_TRACKER;
     }
 
+    public static boolean isAutomationEnabled() {
+        return AUTOMATION_CONTROLLER.isEnabled();
+    }
+
     public static Component getStatusOverlayMessage() {
         return statusOverlayTicksRemaining > 0 ? statusOverlayMessage : null;
     }
@@ -96,6 +100,11 @@ public final class WynnHorseClient {
             HORSE_ITEM_TRACKER.refresh(minecraft);
 
             boolean enabled = AUTOMATION_CONTROLLER.toggle(minecraft);
+            if (!enabled) {
+                HORSE_ITEM_TRACKER.clearMountedHorseState();
+            } else {
+                HORSE_ITEM_TRACKER.clearMountedHorseState();
+            }
             showStatusOverlay(
                     Component.translatable(enabled ? "message.wynnhorse.automation.enabled" : "message.wynnhorse.automation.disabled")
             );
@@ -104,6 +113,9 @@ public final class WynnHorseClient {
         HORSE_ITEM_TRACKER.refresh(minecraft);
 
         Component automationUpdate = AUTOMATION_CONTROLLER.tick(minecraft, WAYPOINT_STORE.route(), HORSE_ITEM_TRACKER);
+        if (!AUTOMATION_CONTROLLER.isEnabled()) {
+            HORSE_ITEM_TRACKER.clearMountedHorseState();
+        }
         if (automationUpdate != null) {
             showStatusOverlay(automationUpdate);
         }

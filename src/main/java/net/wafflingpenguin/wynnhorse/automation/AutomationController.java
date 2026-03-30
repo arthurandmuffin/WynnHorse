@@ -130,6 +130,7 @@ public final class AutomationController {
                 AbstractHorse mountedHorse = horseStepOutcome.horse();
                 if (mountedHorse != null && !mountedHorse.getUUID().equals(this.announcedMountedHorseId)) {
                     this.announcedMountedHorseId = mountedHorse.getUUID();
+                    horseItemTracker.markPendingHorseAsMounted();
                     this.awaitingPostMountAlignment = true;
                     this.postMountAlignmentState = null;
                     LOGGER.info("Mounted horse {}", mountedHorse.getUUID());

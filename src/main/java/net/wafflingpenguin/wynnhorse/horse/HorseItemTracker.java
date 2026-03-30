@@ -29,6 +29,8 @@ public final class HorseItemTracker {
             .thenComparingInt(HorseItemMatch::slot);
 
     private List<HorseItemMatch> matches = List.of();
+    private Integer pendingMountedHorseSlot;
+    private Integer activeMountedHorseSlot;
 
     public void refresh(final Minecraft minecraft) {
         if (minecraft.player == null || minecraft.level == null) {
@@ -87,8 +89,24 @@ public final class HorseItemTracker {
         this.refresh(minecraft);
 
         Optional<HorseItemMatch> preferredMatch = this.getPreferredMatch();
-        preferredMatch.ifPresent(match -> minecraft.player.getInventory().setSelectedSlot(match.slot()));
+        preferredMatch.ifPresent(match -> {
+            this.pendingMountedHorseSlot = match.slot();
+            minecraft.player.getInventory().setSelectedSlot(match.slot());
+        });
         return preferredMatch;
+    }
+
+    public void markPendingHorseAsMounted() {
+        this.activeMountedHorseSlot = this.pendingMountedHorseSlot;
+    }
+
+    public boolean isMountedHorseSlot(final int slot) {
+        return this.activeMountedHorseSlot != null && this.activeMountedHorseSlot == slot;
+    }
+
+    public void clearMountedHorseState() {
+        this.pendingMountedHorseSlot = null;
+        this.activeMountedHorseSlot = null;
     }
 
     public boolean selectNonHorseItem(final Minecraft minecraft) {

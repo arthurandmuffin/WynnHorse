@@ -45,8 +45,12 @@ public final class HorseMatchOverlay {
         Font font = minecraft.font;
         int panelWidth = font.width(TITLE.getString());
         int panelHeight = font.lineHeight + PADDING * 2 + 2;
+        int detailsColumnOffset = 0;
         for (HorseItemMatch match : matches) {
-            panelWidth = Math.max(panelWidth, rowWidth(font, match));
+            detailsColumnOffset = Math.max(detailsColumnOffset, leftColumnWidth(font, match));
+        }
+        for (HorseItemMatch match : matches) {
+            panelWidth = Math.max(panelWidth, rowWidth(font, match, detailsColumnOffset));
             panelHeight += rowHeight(font, match);
         }
 
@@ -60,6 +64,7 @@ public final class HorseMatchOverlay {
         int selectedSlot = minecraft.player.getInventory().getSelectedSlot();
         int textY = y + PADDING + font.lineHeight + 2;
         int textColor = WynnHorseConfig.parseHexColor(WynnHorseConfig.getWaypointTextColor(), SLOT_TEXT_COLOR);
+        boolean automationEnabled = WynnHorseClient.isAutomationEnabled();
 
         for (HorseItemMatch match : matches) {
             int currentRowHeight = rowHeight(font, match);
@@ -68,40 +73,43 @@ public final class HorseMatchOverlay {
             }
 
             graphics.text(font, match.labelText(), x + PADDING, textY, textColor, false);
+            int nextX = x + PADDING + font.width(match.labelText());
             if (match.hasParsedStat()) {
-                int statX = x + PADDING + font.width(match.labelText()) + 4;
+                int statX = nextX + 4;
                 graphics.text(font, match.statText(), statX, textY, STAT_TEXT_COLOR, false);
+                nextX = statX + font.width(match.statText());
             }
-            textY += font.lineHeight + ROW_SPACING;
 
             if (match.hasTimingEstimate()) {
-                graphics.text(font, match.timingText(), x + PADDING + 8, textY, DETAIL_TEXT_COLOR, false);
-                textY += font.lineHeight + ROW_SPACING;
+                boolean useEtaLabel = automationEnabled && WynnHorseClient.getHorseItemTracker().isMountedHorseSlot(match.slot());
+                int detailX = x + PADDING + detailsColumnOffset + 10;
+                graphics.text(font, match.timingText(useEtaLabel), detailX, textY, DETAIL_TEXT_COLOR, false);
             }
+
+            textY += font.lineHeight + ROW_SPACING;
         }
 
         renderStatusMessage(graphics, font);
     }
 
-    private static int rowWidth(final Font font, final HorseItemMatch match) {
-        int width = match.hasParsedStat()
+    private static int leftColumnWidth(final Font font, final HorseItemMatch match) {
+        return match.hasParsedStat()
                 ? font.width(match.labelText()) + 4 + font.width(match.statText())
                 : font.width(match.labelText());
+    }
+
+    private static int rowWidth(final Font font, final HorseItemMatch match, final int detailsColumnOffset) {
+        int width = leftColumnWidth(font, match);
 
         if (match.hasTimingEstimate()) {
-            width = Math.max(width, 8 + font.width(match.timingText()));
+            width = Math.max(width, detailsColumnOffset) + 10 + Math.max(font.width(match.timingText(false)), font.width(match.timingText(true)));
         }
 
         return width;
     }
 
     private static int rowHeight(final Font font, final HorseItemMatch match) {
-        int height = font.lineHeight + ROW_SPACING;
-        if (match.hasTimingEstimate()) {
-            height += font.lineHeight + ROW_SPACING;
-        }
-
-        return height;
+        return font.lineHeight + ROW_SPACING;
     }
 
     private static void renderStatusMessage(final GuiGraphicsExtractor graphics, final Font font) {
