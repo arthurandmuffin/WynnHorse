@@ -19,6 +19,7 @@ public final class HorseMatchOverlay {
     private static final int SLOT_HIGHLIGHT = 0x553A7A9B;
     private static final int SLOT_TEXT_COLOR = 0xFFD0D0D0;
     private static final int STAT_TEXT_COLOR = 0xFFFFB347;
+    private static final int DETAIL_TEXT_COLOR = 0xFF9ED2E6;
     private static final int STATUS_MESSAGE_BACKGROUND = 0xA0202020;
     private static final int STATUS_MESSAGE_BORDER = 0xD0808080;
     private static final int STATUS_MESSAGE_TEXT = 0xFFFFFFFF;
@@ -42,13 +43,13 @@ public final class HorseMatchOverlay {
         }
 
         Font font = minecraft.font;
-        int lineHeight = font.lineHeight + ROW_SPACING;
         int panelWidth = font.width(TITLE.getString());
+        int panelHeight = font.lineHeight + PADDING * 2 + 2;
         for (HorseItemMatch match : matches) {
             panelWidth = Math.max(panelWidth, rowWidth(font, match));
+            panelHeight += rowHeight(font, match);
         }
 
-        int panelHeight = (lineHeight * matches.size()) + font.lineHeight + PADDING * 2 + 2;
         int x = 8;
         int y = 24;
 
@@ -61,8 +62,9 @@ public final class HorseMatchOverlay {
         int textColor = WynnHorseConfig.parseHexColor(WynnHorseConfig.getWaypointTextColor(), SLOT_TEXT_COLOR);
 
         for (HorseItemMatch match : matches) {
+            int currentRowHeight = rowHeight(font, match);
             if (match.slot() == selectedSlot) {
-                graphics.fill(x + 1, textY - 1, x + panelWidth + (PADDING * 2) - 1, textY + font.lineHeight + 1, SLOT_HIGHLIGHT);
+                graphics.fill(x + 1, textY - 1, x + panelWidth + (PADDING * 2) - 1, textY + currentRowHeight - 1, SLOT_HIGHLIGHT);
             }
 
             graphics.text(font, match.labelText(), x + PADDING, textY, textColor, false);
@@ -70,18 +72,36 @@ public final class HorseMatchOverlay {
                 int statX = x + PADDING + font.width(match.labelText()) + 4;
                 graphics.text(font, match.statText(), statX, textY, STAT_TEXT_COLOR, false);
             }
-            textY += lineHeight;
+            textY += font.lineHeight + ROW_SPACING;
+
+            if (match.hasTimingEstimate()) {
+                graphics.text(font, match.timingText(), x + PADDING + 8, textY, DETAIL_TEXT_COLOR, false);
+                textY += font.lineHeight + ROW_SPACING;
+            }
         }
 
         renderStatusMessage(graphics, font);
     }
 
     private static int rowWidth(final Font font, final HorseItemMatch match) {
-        if (!match.hasParsedStat()) {
-            return font.width(match.labelText());
+        int width = match.hasParsedStat()
+                ? font.width(match.labelText()) + 4 + font.width(match.statText())
+                : font.width(match.labelText());
+
+        if (match.hasTimingEstimate()) {
+            width = Math.max(width, 8 + font.width(match.timingText()));
         }
 
-        return font.width(match.labelText()) + 4 + font.width(match.statText());
+        return width;
+    }
+
+    private static int rowHeight(final Font font, final HorseItemMatch match) {
+        int height = font.lineHeight + ROW_SPACING;
+        if (match.hasTimingEstimate()) {
+            height += font.lineHeight + ROW_SPACING;
+        }
+
+        return height;
     }
 
     private static void renderStatusMessage(final GuiGraphicsExtractor graphics, final Font font) {

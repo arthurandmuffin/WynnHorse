@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 public final class HorseItemTracker {
     private static final Pattern HORSE_STAT_PATTERN = Pattern.compile("(?i)\\b(speed|jump)\\b\\s*:?\\s*(\\d+)\\s*/\\s*(\\d+)\\b");
     private static final Pattern GENERIC_STAT_PATTERN = Pattern.compile("\\b(\\d+)\\s*/\\s*(\\d+)\\b");
+    private static final Pattern LEVEL_XP_PATTERN = Pattern.compile("\\b(\\d{1,3})\\s*/\\s*100\\b");
     private static final Comparator<HorseItemMatch> MATCH_ORDER = Comparator
             .comparing(HorseItemMatch::hasParsedStat).reversed()
             .thenComparing(match -> match.statMaximum() == null ? Integer.MIN_VALUE : match.statMaximum(), Comparator.reverseOrder())
@@ -136,32 +137,45 @@ public final class HorseItemTracker {
     }
 
     private static HorseItemMatch buildMatch(final ItemStack stack, final int slot, final String displayName, final Item.TooltipContext tooltipContext, final Minecraft minecraft) {
+        String parsedStatName = null;
+        Integer parsedStatValue = null;
+        Integer parsedStatMaximum = null;
+        Integer parsedXpPercent = null;
+
         for (Component tooltipLine : stack.getTooltipLines(tooltipContext, minecraft.player, TooltipFlag.NORMAL)) {
             String line = tooltipLine.getString();
 
-            Matcher labeledMatcher = HORSE_STAT_PATTERN.matcher(line);
-            if (labeledMatcher.find()) {
-                return new HorseItemMatch(
-                        slot,
-                        displayName,
-                        labeledMatcher.group(1),
-                        Integer.parseInt(labeledMatcher.group(2)),
-                        Integer.parseInt(labeledMatcher.group(3))
-                );
+            if (parsedStatValue == null || parsedStatMaximum == null) {
+                Matcher labeledMatcher = HORSE_STAT_PATTERN.matcher(line);
+                if (labeledMatcher.find()) {
+                    parsedStatName = labeledMatcher.group(1);
+                    parsedStatValue = Integer.parseInt(labeledMatcher.group(2));
+                    parsedStatMaximum = Integer.parseInt(labeledMatcher.group(3));
+                    continue;
+                }
+
+                Matcher genericMatcher = GENERIC_STAT_PATTERN.matcher(line);
+                if (genericMatcher.find()) {
+                    parsedStatValue = Integer.parseInt(genericMatcher.group(1));
+                    parsedStatMaximum = Integer.parseInt(genericMatcher.group(2));
+                    continue;
+                }
             }
 
-            Matcher genericMatcher = GENERIC_STAT_PATTERN.matcher(line);
-            if (genericMatcher.find()) {
-                return new HorseItemMatch(
-                        slot,
-                        displayName,
-                        null,
-                        Integer.parseInt(genericMatcher.group(1)),
-                        Integer.parseInt(genericMatcher.group(2))
-                );
+            if (parsedXpPercent == null) {
+                Matcher xpMatcher = LEVEL_XP_PATTERN.matcher(line);
+                while (xpMatcher.find()) {
+                    int parsedValue = Integer.parseInt(xpMatcher.group(1));
+                    if (parsedStatMaximum != null && parsedStatMaximum == 100 && parsedStatValue != null && parsedValue == parsedStatValue) {
+                        continue;
+                    }
+
+                    parsedXpPercent = Math.max(0, Math.min(100, parsedValue));
+                    break;
+                }
             }
         }
 
-        return new HorseItemMatch(slot, displayName, null, null, null);
+        return new HorseItemMatch(slot, displayName, parsedStatName, parsedStatValue, parsedStatMaximum, parsedXpPercent);
     }
 }
