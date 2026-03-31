@@ -39,7 +39,7 @@ public final class NavigationController {
         }
 
         Waypoint nextWaypoint = this.resolveNextWaypoint(waypoints, activeIndex);
-        SteeringProfile steeringProfile = this.resolveSteeringProfile(player.position(), waypoint.position(), nextWaypoint == null ? null : nextWaypoint.position());
+        SteeringProfile steeringProfile = this.resolveSteeringProfile(player, waypoint.position(), nextWaypoint == null ? null : nextWaypoint.position());
         this.steerPlayer(player, steeringProfile.targetPosition(), steeringProfile.yawStepDegrees());
         return NavigationOutcome.navigating(waypoint);
     }
@@ -79,15 +79,18 @@ public final class NavigationController {
         return waypoints.get((activeIndex + 1) % waypoints.size());
     }
 
-    private SteeringProfile resolveSteeringProfile(final Vec3 playerPosition, final Vec3 currentWaypointPosition, final Vec3 nextWaypointPosition) {
+    private SteeringProfile resolveSteeringProfile(final LocalPlayer player, final Vec3 currentWaypointPosition, final Vec3 nextWaypointPosition) {
+        Vec3 playerPosition = player.position();
         if (nextWaypointPosition == null) {
             return new SteeringProfile(currentWaypointPosition, WynnHorseConfig.getSteeringYawStepDegrees());
         }
 
         double nextSegmentLength = horizontalDistance(currentWaypointPosition, nextWaypointPosition);
         double cornerAngleDegrees = cornerAngleDegrees(playerPosition, currentWaypointPosition, nextWaypointPosition);
-        double dynamicStartDistance = this.dynamicTurnStartDistance(cornerAngleDegrees, nextSegmentLength);
-        double dynamicYawStep = this.dynamicTurnYawStepDegrees(cornerAngleDegrees, nextSegmentLength);
+        double currentSpeed = horizontalSpeed(player.getDeltaMovement());
+        TurnComputation turnComputation = this.computeDynamicTurn(cornerAngleDegrees, nextSegmentLength, currentSpeed, horizontalDistance(playerPosition, currentWaypointPosition));
+        double dynamicStartDistance = turnComputation.startDistance();
+        double dynamicYawStep = turnComputation.yawStepDegrees();
 
         double cornerRadius = Math.max(dynamicStartDistance, WynnHorseConfig.getWaypointReachedDistance());
         double currentDistance = horizontalDistance(playerPosition, currentWaypointPosition);
@@ -101,7 +104,7 @@ public final class NavigationController {
             return new SteeringProfile(currentWaypointPosition, dynamicYawStep);
         }
 
-        double blend = Mth.clamp(1.0D - currentDistance / cornerRadius, 0.0D, 1.0D);
+        double blend = Mth.clamp((1.0D - currentDistance / cornerRadius) * turnComputation.blendBoost(), 0.0D, 1.0D);
         blend *= blend;
 
         Vec3 blendedDirection = currentDirection.scale(1.0D - blend).add(nextDirection.scale(blend));
@@ -214,31 +217,63 @@ public final class NavigationController {
         return Math.toDegrees(Math.acos(dot));
     }
 
-    private double dynamicTurnStartDistance(final double cornerAngleDegrees, final double nextSegmentLength) {
-        double sharpness = Mth.clamp(cornerAngleDegrees / 180.0D, 0.0D, 1.0D);
+    private TurnComputation computeDynamicTurn(
+            final double cornerAngleDegrees,
+            final double nextSegmentLength,
+            final double currentSpeed,
+            final double currentDistance
+    ) {
+        double normalizedAngle = Mth.clamp(cornerAngleDegrees / 180.0D, 0.0D, 1.0D);
+        double angleExponent = Math.max(0.1D, WynnHorseConfig.getDynamicTurnAngleExponent());
+        double sharpness = Math.pow(normalizedAngle, angleExponent);
         double gentleness = 1.0D - sharpness;
         double lengthCap = Math.max(1.0D, WynnHorseConfig.getDynamicTurnNextSegmentLengthCap());
         double nextLengthFactor = Mth.clamp(nextSegmentLength / lengthCap, 0.0D, 1.0D);
-        double earlyTurnFactor = Mth.clamp((gentleness * 0.75D) + (nextLengthFactor * 0.25D), 0.0D, 1.0D);
-
-        return Mth.lerp(
+        double speedCap = Math.max(0.05D, WynnHorseConfig.getDynamicTurnSpeedCapBlocksPerTick());
+        double speedFactor = Mth.clamp(currentSpeed / speedCap, 0.0D, 1.0D);
+        double earlyTurnFactor = Mth.clamp((gentleness * 0.45D) + (nextLengthFactor * 0.20D) + (speedFactor * 0.35D), 0.0D, 1.0D);
+        double idealStartDistance = Mth.lerp(
                 earlyTurnFactor,
                 WynnHorseConfig.getDynamicTurnMinStartDistance(),
                 WynnHorseConfig.getDynamicTurnMaxStartDistance()
         );
+        double lateFraction = idealStartDistance <= 1.0E-6D
+                ? 0.0D
+                : Mth.clamp((idealStartDistance - currentDistance) / idealStartDistance, 0.0D, 1.0D);
+        double lateBoost = 1.0D + (lateFraction * WynnHorseConfig.getDynamicTurnLateCompensationMaxBoost());
+        double urgencyFactor = Mth.clamp(
+                (sharpness * 0.50D) + ((1.0D - nextLengthFactor) * 0.15D) + (speedFactor * 0.35D),
+                0.0D,
+                1.0D
+        );
+        double baseYawStep = WynnHorseConfig.getSteeringYawStepDegrees();
+        double dynamicYawStep = baseYawStep * (0.75D + (urgencyFactor * 1.75D));
+        dynamicYawStep *= this.highAngleYawBoostMultiplier(cornerAngleDegrees);
+        dynamicYawStep *= lateBoost;
+        dynamicYawStep = Mth.clamp(dynamicYawStep, 0.5D, Math.max(baseYawStep * 6.0D, 6.0D));
+        double compensatedStartDistance = Math.max(idealStartDistance, WynnHorseConfig.getWaypointReachedDistance());
+        return new TurnComputation(compensatedStartDistance, dynamicYawStep, lateBoost);
     }
 
-    private double dynamicTurnYawStepDegrees(final double cornerAngleDegrees, final double nextSegmentLength) {
-        double sharpness = Mth.clamp(cornerAngleDegrees / 180.0D, 0.0D, 1.0D);
-        double lengthCap = Math.max(1.0D, WynnHorseConfig.getDynamicTurnNextSegmentLengthCap());
-        double nextLengthFactor = Mth.clamp(nextSegmentLength / lengthCap, 0.0D, 1.0D);
-        double decisiveTurnFactor = Mth.clamp((sharpness * 0.75D) + ((1.0D - nextLengthFactor) * 0.25D), 0.0D, 1.0D);
+    private double highAngleYawBoostMultiplier(final double cornerAngleDegrees) {
+        double thresholdDegrees = Mth.clamp(WynnHorseConfig.getDynamicTurnHighAngleThresholdDegrees(), 0.0D, 179.0D);
+        if (cornerAngleDegrees <= thresholdDegrees) {
+            return 1.0D;
+        }
 
-        return Mth.lerp(
-                decisiveTurnFactor,
-                WynnHorseConfig.getDynamicTurnMinYawStepDegrees(),
-                WynnHorseConfig.getDynamicTurnMaxYawStepDegrees()
+        double normalizedHighAngle = Mth.clamp(
+                (cornerAngleDegrees - thresholdDegrees) / Math.max(1.0D, 180.0D - thresholdDegrees),
+                0.0D,
+                1.0D
         );
+        double curveExponent = Math.max(0.1D, WynnHorseConfig.getDynamicTurnHighAngleCurveExponent());
+        double curvedFactor = Math.pow(normalizedHighAngle, curveExponent);
+        double maxMultiplier = Math.max(1.0D, WynnHorseConfig.getDynamicTurnHighAngleMaxMultiplier());
+        return Mth.lerp(curvedFactor, 1.0D, maxMultiplier);
+    }
+
+    private static double horizontalSpeed(final Vec3 deltaMovement) {
+        return Math.sqrt(Mth.lengthSquared(deltaMovement.x, deltaMovement.z));
     }
 
     public record NavigationOutcome(Status status, Waypoint waypoint) {
@@ -285,5 +320,8 @@ public final class NavigationController {
     }
 
     private record SteeringProfile(Vec3 targetPosition, double yawStepDegrees) {
+    }
+
+    private record TurnComputation(double startDistance, double yawStepDegrees, double blendBoost) {
     }
 }

@@ -32,14 +32,6 @@ public final class WynnHorseConfig {
             .comment("Distance from a waypoint where steering may begin blending toward the next waypoint.")
             .defineInRange("waypointCornerRadius", 6.0D, 0.5D, 32.0D);
 
-    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_MIN_YAW_STEP_DEGREES = BUILDER
-            .comment("Minimum yaw change per tick used by dynamic waypoint steering for wide gentle turns.")
-            .defineInRange("dynamicTurnMinYawStepDegrees", 2.5D, 0.1D, 45.0D);
-
-    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_MAX_YAW_STEP_DEGREES = BUILDER
-            .comment("Maximum yaw change per tick used by dynamic waypoint steering for tight sharp turns.")
-            .defineInRange("dynamicTurnMaxYawStepDegrees", 15.0D, 0.1D, 90.0D);
-
     private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_MIN_START_DISTANCE = BUILDER
             .comment("Minimum distance from the waypoint where dynamic steering may begin turning for sharp corners.")
             .defineInRange("dynamicTurnMinStartDistance", 3.0D, 0.25D, 32.0D);
@@ -51,6 +43,34 @@ public final class WynnHorseConfig {
     private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_NEXT_SEGMENT_LENGTH_CAP = BUILDER
             .comment("Next-segment length that counts as fully long when computing dynamic turn-start distance and turn rate.")
             .defineInRange("dynamicTurnNextSegmentLengthCap", 20.0D, 1.0D, 128.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_ANGLE_EXPONENT = BUILDER
+            .comment("Exponent applied after normalizing turn angle against 180 degrees. Values below 1.0 make medium and large turns more decisive.")
+            .defineInRange("dynamicTurnAngleExponent", 0.6D, 0.1D, 2.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_HIGH_ANGLE_THRESHOLD_DEGREES = BUILDER
+            .comment("Turn-angle threshold where an extra nonlinear steering boost begins to apply.")
+            .defineInRange("dynamicTurnHighAngleThresholdDegrees", 60.0D, 0.0D, 179.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_HIGH_ANGLE_CURVE_EXPONENT = BUILDER
+            .comment("Curve exponent for the extra high-angle steering boost. Values below 1.0 make the boost ramp up sooner after the threshold.")
+            .defineInRange("dynamicTurnHighAngleCurveExponent", 0.5D, 0.1D, 2.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_HIGH_ANGLE_MAX_MULTIPLIER = BUILDER
+            .comment("Maximum steering multiplier applied for very large corners after the high-angle threshold is crossed.")
+            .defineInRange("dynamicTurnHighAngleMaxMultiplier", 2.25D, 1.0D, 5.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_SPEED_CAP_BLOCKS_PER_TICK = BUILDER
+            .comment("Horizontal movement speed in blocks per tick that counts as fully fast when computing dynamic turn timing and urgency.")
+            .defineInRange("dynamicTurnSpeedCapBlocksPerTick", 0.45D, 0.05D, 2.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_LATE_COMPENSATION_MAX_BOOST = BUILDER
+            .comment("Maximum extra steering urgency applied when the player is already inside the ideal turn-start distance.")
+            .defineInRange("dynamicTurnLateCompensationMaxBoost", 1.0D, 0.0D, 4.0D);
+
+    private static final ForgeConfigSpec.IntValue HORSE_ITEM_REFRESH_INTERVAL_TICKS_DURING_AUTOMATION = BUILDER
+            .comment("How often to refresh horse-item tooltip data while automation is active so the HUD and max-level detection stay current.")
+            .defineInRange("horseItemRefreshIntervalTicksDuringAutomation", 10, 1, 200);
 
     private static final ForgeConfigSpec.DoubleValue TRAVEL_DEFAULT_PITCH_DEGREES = BUILDER
             .comment("Default pitch in degrees used during ordinary travel steering. Positive values look downward.")
@@ -182,11 +202,16 @@ public final class WynnHorseConfig {
     public static double waypointReachedDistance = WAYPOINT_REACHED_DISTANCE.get();
     public static double steeringYawStepDegrees = STEERING_YAW_STEP_DEGREES.get();
     public static double waypointCornerRadius = WAYPOINT_CORNER_RADIUS.get();
-    public static double dynamicTurnMinYawStepDegrees = DYNAMIC_TURN_MIN_YAW_STEP_DEGREES.get();
-    public static double dynamicTurnMaxYawStepDegrees = DYNAMIC_TURN_MAX_YAW_STEP_DEGREES.get();
     public static double dynamicTurnMinStartDistance = DYNAMIC_TURN_MIN_START_DISTANCE.get();
     public static double dynamicTurnMaxStartDistance = DYNAMIC_TURN_MAX_START_DISTANCE.get();
     public static double dynamicTurnNextSegmentLengthCap = DYNAMIC_TURN_NEXT_SEGMENT_LENGTH_CAP.get();
+    public static double dynamicTurnAngleExponent = DYNAMIC_TURN_ANGLE_EXPONENT.get();
+    public static double dynamicTurnHighAngleThresholdDegrees = DYNAMIC_TURN_HIGH_ANGLE_THRESHOLD_DEGREES.get();
+    public static double dynamicTurnHighAngleCurveExponent = DYNAMIC_TURN_HIGH_ANGLE_CURVE_EXPONENT.get();
+    public static double dynamicTurnHighAngleMaxMultiplier = DYNAMIC_TURN_HIGH_ANGLE_MAX_MULTIPLIER.get();
+    public static double dynamicTurnSpeedCapBlocksPerTick = DYNAMIC_TURN_SPEED_CAP_BLOCKS_PER_TICK.get();
+    public static double dynamicTurnLateCompensationMaxBoost = DYNAMIC_TURN_LATE_COMPENSATION_MAX_BOOST.get();
+    public static int horseItemRefreshIntervalTicksDuringAutomation = HORSE_ITEM_REFRESH_INTERVAL_TICKS_DURING_AUTOMATION.get();
     public static double travelDefaultPitchDegrees = TRAVEL_DEFAULT_PITCH_DEGREES.get();
     public static double travelPitchPullStepDegrees = TRAVEL_PITCH_PULL_STEP_DEGREES.get();
     public static double travelPitchRecoveryStepDegrees = TRAVEL_PITCH_RECOVERY_STEP_DEGREES.get();
@@ -232,11 +257,16 @@ public final class WynnHorseConfig {
         waypointReachedDistance = WAYPOINT_REACHED_DISTANCE.get();
         steeringYawStepDegrees = STEERING_YAW_STEP_DEGREES.get();
         waypointCornerRadius = WAYPOINT_CORNER_RADIUS.get();
-        dynamicTurnMinYawStepDegrees = DYNAMIC_TURN_MIN_YAW_STEP_DEGREES.get();
-        dynamicTurnMaxYawStepDegrees = DYNAMIC_TURN_MAX_YAW_STEP_DEGREES.get();
         dynamicTurnMinStartDistance = DYNAMIC_TURN_MIN_START_DISTANCE.get();
         dynamicTurnMaxStartDistance = DYNAMIC_TURN_MAX_START_DISTANCE.get();
         dynamicTurnNextSegmentLengthCap = DYNAMIC_TURN_NEXT_SEGMENT_LENGTH_CAP.get();
+        dynamicTurnAngleExponent = DYNAMIC_TURN_ANGLE_EXPONENT.get();
+        dynamicTurnHighAngleThresholdDegrees = DYNAMIC_TURN_HIGH_ANGLE_THRESHOLD_DEGREES.get();
+        dynamicTurnHighAngleCurveExponent = DYNAMIC_TURN_HIGH_ANGLE_CURVE_EXPONENT.get();
+        dynamicTurnHighAngleMaxMultiplier = DYNAMIC_TURN_HIGH_ANGLE_MAX_MULTIPLIER.get();
+        dynamicTurnSpeedCapBlocksPerTick = DYNAMIC_TURN_SPEED_CAP_BLOCKS_PER_TICK.get();
+        dynamicTurnLateCompensationMaxBoost = DYNAMIC_TURN_LATE_COMPENSATION_MAX_BOOST.get();
+        horseItemRefreshIntervalTicksDuringAutomation = HORSE_ITEM_REFRESH_INTERVAL_TICKS_DURING_AUTOMATION.get();
         travelDefaultPitchDegrees = TRAVEL_DEFAULT_PITCH_DEGREES.get();
         travelPitchPullStepDegrees = TRAVEL_PITCH_PULL_STEP_DEGREES.get();
         travelPitchRecoveryStepDegrees = TRAVEL_PITCH_RECOVERY_STEP_DEGREES.get();
@@ -295,14 +325,6 @@ public final class WynnHorseConfig {
         return waypointCornerRadius;
     }
 
-    public static double getDynamicTurnMinYawStepDegrees() {
-        return dynamicTurnMinYawStepDegrees;
-    }
-
-    public static double getDynamicTurnMaxYawStepDegrees() {
-        return dynamicTurnMaxYawStepDegrees;
-    }
-
     public static double getDynamicTurnMinStartDistance() {
         return dynamicTurnMinStartDistance;
     }
@@ -313,6 +335,34 @@ public final class WynnHorseConfig {
 
     public static double getDynamicTurnNextSegmentLengthCap() {
         return dynamicTurnNextSegmentLengthCap;
+    }
+
+    public static double getDynamicTurnAngleExponent() {
+        return dynamicTurnAngleExponent;
+    }
+
+    public static double getDynamicTurnHighAngleThresholdDegrees() {
+        return dynamicTurnHighAngleThresholdDegrees;
+    }
+
+    public static double getDynamicTurnHighAngleCurveExponent() {
+        return dynamicTurnHighAngleCurveExponent;
+    }
+
+    public static double getDynamicTurnHighAngleMaxMultiplier() {
+        return dynamicTurnHighAngleMaxMultiplier;
+    }
+
+    public static double getDynamicTurnSpeedCapBlocksPerTick() {
+        return dynamicTurnSpeedCapBlocksPerTick;
+    }
+
+    public static double getDynamicTurnLateCompensationMaxBoost() {
+        return dynamicTurnLateCompensationMaxBoost;
+    }
+
+    public static int getHorseItemRefreshIntervalTicksDuringAutomation() {
+        return horseItemRefreshIntervalTicksDuringAutomation;
     }
 
     public static double getTravelDefaultPitchDegrees() {

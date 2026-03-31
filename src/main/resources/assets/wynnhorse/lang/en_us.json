@@ -43,6 +43,7 @@
   "screen.wynnhorse.text_color": "Text",
   "screen.wynnhorse.render_style": "Waypoint Render Style",
   "screen.wynnhorse.route_line_color": "Route Line",
+  "screen.wynnhorse.version": "Version:",
   "screen.wynnhorse.render_style_value": "Render Style: %s",
   "screen.wynnhorse.render_style.marker": "Marker",
   "screen.wynnhorse.render_style.beacon": "Beacon",

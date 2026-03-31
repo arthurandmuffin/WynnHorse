@@ -14,11 +14,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 import net.minecraft.world.phys.Vec3;
 import net.wafflingpenguin.wynnhorse.WaypointRenderStyle;
+import net.wafflingpenguin.wynnhorse.WynnHorse;
 import net.wafflingpenguin.wynnhorse.WynnHorseConfig;
 import net.wafflingpenguin.wynnhorse.client.WynnHorseClient;
 import net.wafflingpenguin.wynnhorse.waypoint.Waypoint;
 import net.wafflingpenguin.wynnhorse.waypoint.WaypointRoute;
 import net.wafflingpenguin.wynnhorse.waypoint.WaypointRouteCsvStorage;
+import net.minecraftforge.fml.loading.LoadingModList;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -39,6 +41,7 @@ public final class WaypointManagerScreen extends Screen {
     private static final Component TEXT_COLOR_LABEL = Component.translatable("screen.wynnhorse.text_color");
     private static final Component RENDER_STYLE_LABEL = Component.translatable("screen.wynnhorse.render_style");
     private static final Component ROUTE_LINE_COLOR_LABEL = Component.translatable("screen.wynnhorse.route_line_color");
+    private static final Component VERSION_PREFIX = Component.translatable("screen.wynnhorse.version");
     private static final Component X_LABEL = Component.literal("X");
     private static final Component Y_LABEL = Component.literal("Y");
     private static final Component Z_LABEL = Component.literal("Z");
@@ -52,6 +55,7 @@ public final class WaypointManagerScreen extends Screen {
     private static final int ROUTE_BUTTON_BACKGROUND = 0xAA2A2A2A;
     private static final int ROUTE_BUTTON_BORDER = 0xFF7A7A7A;
     private static final int ROUTE_BUTTON_TEXT = -1;
+    private static final int HEADER_SECONDARY_TEXT_COLOR = -4144960;
 
     private final WaypointRoute route;
 
@@ -77,6 +81,7 @@ public final class WaypointManagerScreen extends Screen {
     private Button doneButton;
     private Button newWaypointButton;
     private Button renderStyleButton;
+    private Component versionLabel = Component.empty();
 
     private UUID selectedWaypointId;
     private boolean syncingFields;
@@ -89,6 +94,7 @@ public final class WaypointManagerScreen extends Screen {
 
     @Override
     protected void init() {
+        this.versionLabel = versionLabel();
         int margin = 12;
         int routeFieldY = 40;
         int listLabelY = 68;
@@ -264,6 +270,16 @@ public final class WaypointManagerScreen extends Screen {
     public void extractRenderState(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float a) {
         super.extractRenderState(graphics, mouseX, mouseY, a);
         graphics.centeredText(this.font, this.title, this.width / 2, 12, 16777215);
+        graphics.text(this.font, this.versionLabel, this.width - 12 - this.font.width(this.versionLabel), 14, HEADER_SECONDARY_TEXT_COLOR, false);
+    }
+
+    private static Component versionLabel() {
+        String version = LoadingModList.getMods().stream()
+                .filter(modInfo -> WynnHorse.MOD_ID.equals(modInfo.getModId()))
+                .findFirst()
+                .map(modInfo -> modInfo.getVersion().toString())
+                .orElse("unknown");
+        return Component.empty().append(VERSION_PREFIX).append(Component.literal(" " + version));
     }
 
     private void closeScreen() {

@@ -35,6 +35,7 @@ public final class AutomationController {
     private UUID horseRotationHorseId;
     private UUID announcedMountedHorseId;
     private UUID announcedApproachHorseId;
+    private int horseTrackerRefreshCooldownTicks;
 
     public boolean toggle(final Minecraft minecraft) {
         if (this.enabled) {
@@ -59,6 +60,8 @@ public final class AutomationController {
             this.disable(minecraft, "left world");
             return null;
         }
+
+        this.refreshHorseTrackerIfNeeded(minecraft, horseItemTracker);
 
         if (this.horseRotationPhase != HorseRotationPhase.NONE) {
             return this.handleHorseRotation(minecraft, horseItemTracker);
@@ -336,6 +339,7 @@ public final class AutomationController {
         horseItemTracker.clearMountedHorseState();
         this.horseSpawnController.reset();
         this.mountRetryCooldownTicks = 0;
+        this.horseTrackerRefreshCooldownTicks = 0;
         this.horseApproachPauseTicksRemaining = 0;
         this.awaitingPostMountAlignment = false;
         this.postMountAlignmentState = null;
@@ -498,6 +502,7 @@ public final class AutomationController {
         this.navigationController.reset();
         this.horseSpawnController.reset();
         this.mountRetryCooldownTicks = 0;
+        this.horseTrackerRefreshCooldownTicks = 0;
         this.horseApproachPauseTicksRemaining = 0;
         this.awaitingPostMountAlignment = false;
         this.postMountAlignmentState = null;
@@ -513,6 +518,7 @@ public final class AutomationController {
         this.navigationController.reset();
         this.horseSpawnController.reset();
         this.mountRetryCooldownTicks = 0;
+        this.horseTrackerRefreshCooldownTicks = 0;
         this.horseApproachPauseTicksRemaining = 0;
         this.awaitingPostMountAlignment = false;
         this.postMountAlignmentState = null;
@@ -522,6 +528,20 @@ public final class AutomationController {
         this.announcedApproachHorseId = null;
         this.releaseMovement(minecraft);
         LOGGER.info("Automation disabled: {}", reason);
+    }
+
+    private void refreshHorseTrackerIfNeeded(final Minecraft minecraft, final HorseItemTracker horseItemTracker) {
+        if (horseItemTracker == null) {
+            return;
+        }
+
+        if (this.horseTrackerRefreshCooldownTicks > 0) {
+            this.horseTrackerRefreshCooldownTicks--;
+            return;
+        }
+
+        horseItemTracker.refresh(minecraft);
+        this.horseTrackerRefreshCooldownTicks = Math.max(1, WynnHorseConfig.getHorseItemRefreshIntervalTicksDuringAutomation());
     }
 
     private void switchAwayFromHorseItem(final Minecraft minecraft, final HorseItemTracker horseItemTracker) {
