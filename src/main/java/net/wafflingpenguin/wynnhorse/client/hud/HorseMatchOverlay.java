@@ -10,6 +10,7 @@ import net.wafflingpenguin.wynnhorse.horse.HorseItemMatch;
 import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
 
 import java.util.List;
+import java.util.OptionalInt;
 
 public final class HorseMatchOverlay {
     private static final Component TITLE = Component.translatable("hud.wynnhorse.horse_matches");
@@ -25,6 +26,10 @@ public final class HorseMatchOverlay {
     private static final int STATUS_MESSAGE_TEXT = 0xFFFFFFFF;
     private static final int PADDING = 6;
     private static final int ROW_SPACING = 2;
+    private static OverlayLayout cachedLayout;
+    private static long cachedRevision = Long.MIN_VALUE;
+    private static boolean cachedAutomationEnabled;
+    private static int cachedMountedHorseSlot = Integer.MIN_VALUE;
 
     private HorseMatchOverlay() {
     }
@@ -43,33 +48,25 @@ public final class HorseMatchOverlay {
         }
 
         Font font = minecraft.font;
-        int panelWidth = font.width(TITLE.getString());
-        int panelHeight = font.lineHeight + PADDING * 2 + 2;
-        int detailsColumnOffset = 0;
-        for (HorseItemMatch match : matches) {
-            detailsColumnOffset = Math.max(detailsColumnOffset, leftColumnWidth(font, match));
-        }
-        for (HorseItemMatch match : matches) {
-            panelWidth = Math.max(panelWidth, rowWidth(font, match, detailsColumnOffset));
-            panelHeight += rowHeight(font, match);
-        }
+        boolean automationEnabled = WynnHorseClient.isAutomationEnabled();
+        OptionalInt mountedHorseSlot = WynnHorseClient.getHorseItemTracker().getActiveMountedHorseSlot();
+        OverlayLayout layout = getLayout(font, matches, automationEnabled, mountedHorseSlot);
 
         int x = 8;
         int y = 24;
 
-        graphics.fill(x, y, x + panelWidth + (PADDING * 2), y + panelHeight, PANEL_BACKGROUND);
-        graphics.outline(x, y, panelWidth + (PADDING * 2), panelHeight, PANEL_BORDER);
+        graphics.fill(x, y, x + layout.panelWidth() + (PADDING * 2), y + layout.panelHeight(), PANEL_BACKGROUND);
+        graphics.outline(x, y, layout.panelWidth() + (PADDING * 2), layout.panelHeight(), PANEL_BORDER);
         graphics.text(font, TITLE, x + PADDING, y + PADDING, TITLE_COLOR, false);
 
         int selectedSlot = minecraft.player.getInventory().getSelectedSlot();
         int textY = y + PADDING + font.lineHeight + 2;
         int textColor = WynnHorseConfig.parseHexColor(WynnHorseConfig.getWaypointTextColor(), SLOT_TEXT_COLOR);
-        boolean automationEnabled = WynnHorseClient.isAutomationEnabled();
 
         for (HorseItemMatch match : matches) {
             int currentRowHeight = rowHeight(font, match);
             if (match.slot() == selectedSlot) {
-                graphics.fill(x + 1, textY - 1, x + panelWidth + (PADDING * 2) - 1, textY + currentRowHeight - 1, SLOT_HIGHLIGHT);
+                graphics.fill(x + 1, textY - 1, x + layout.panelWidth() + (PADDING * 2) - 1, textY + currentRowHeight - 1, SLOT_HIGHLIGHT);
             }
 
             graphics.text(font, match.labelText(), x + PADDING, textY, textColor, false);
@@ -82,7 +79,7 @@ public final class HorseMatchOverlay {
 
             if (match.hasTimingEstimate()) {
                 boolean useEtaLabel = automationEnabled && WynnHorseClient.getHorseItemTracker().isMountedHorseSlot(match.slot());
-                int detailX = x + PADDING + detailsColumnOffset + 10;
+                int detailX = x + PADDING + layout.detailsColumnOffset() + 10;
                 graphics.text(font, match.timingText(useEtaLabel), detailX, textY, DETAIL_TEXT_COLOR, false);
             }
 
@@ -98,11 +95,45 @@ public final class HorseMatchOverlay {
                 : font.width(match.labelText());
     }
 
-    private static int rowWidth(final Font font, final HorseItemMatch match, final int detailsColumnOffset) {
+    private static OverlayLayout getLayout(
+            final Font font,
+            final List<HorseItemMatch> matches,
+            final boolean automationEnabled,
+            final OptionalInt mountedHorseSlot
+    ) {
+        int mountedSlotValue = mountedHorseSlot.orElse(Integer.MIN_VALUE);
+        long revision = WynnHorseClient.getHorseItemTracker().getRevision();
+        if (cachedLayout != null
+                && cachedRevision == revision
+                && cachedAutomationEnabled == automationEnabled
+                && cachedMountedHorseSlot == mountedSlotValue) {
+            return cachedLayout;
+        }
+
+        int panelWidth = font.width(TITLE.getString());
+        int panelHeight = font.lineHeight + PADDING * 2 + 2;
+        int detailsColumnOffset = 0;
+        for (HorseItemMatch match : matches) {
+            detailsColumnOffset = Math.max(detailsColumnOffset, leftColumnWidth(font, match));
+        }
+        for (HorseItemMatch match : matches) {
+            panelWidth = Math.max(panelWidth, rowWidth(font, match, detailsColumnOffset, automationEnabled));
+            panelHeight += rowHeight(font, match);
+        }
+
+        cachedRevision = revision;
+        cachedAutomationEnabled = automationEnabled;
+        cachedMountedHorseSlot = mountedSlotValue;
+        cachedLayout = new OverlayLayout(panelWidth, panelHeight, detailsColumnOffset);
+        return cachedLayout;
+    }
+
+    private static int rowWidth(final Font font, final HorseItemMatch match, final int detailsColumnOffset, final boolean automationEnabled) {
         int width = leftColumnWidth(font, match);
 
         if (match.hasTimingEstimate()) {
-            width = Math.max(width, detailsColumnOffset) + 10 + Math.max(font.width(match.timingText(false)), font.width(match.timingText(true)));
+            boolean useEtaLabel = automationEnabled && WynnHorseClient.getHorseItemTracker().isMountedHorseSlot(match.slot());
+            width = Math.max(width, detailsColumnOffset) + 10 + font.width(match.timingText(useEtaLabel));
         }
 
         return width;
@@ -127,5 +158,8 @@ public final class HorseMatchOverlay {
         graphics.fill(x, y, x + width, y + height, STATUS_MESSAGE_BACKGROUND);
         graphics.outline(x, y, width, height, STATUS_MESSAGE_BORDER);
         graphics.centeredText(font, statusMessage, x + width / 2, y + PADDING, STATUS_MESSAGE_TEXT);
+    }
+
+    private record OverlayLayout(int panelWidth, int panelHeight, int detailsColumnOffset) {
     }
 }

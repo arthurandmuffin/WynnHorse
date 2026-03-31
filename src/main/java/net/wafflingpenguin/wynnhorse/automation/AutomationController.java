@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionResult;
 import net.wafflingpenguin.wynnhorse.horse.HorseItemTracker;
 import net.wafflingpenguin.wynnhorse.horse.HorseSpawnController;
 import net.minecraft.world.InteractionHand;
@@ -30,6 +31,8 @@ public final class AutomationController {
     private int horseApproachPauseTicksRemaining;
     private boolean awaitingPostMountAlignment;
     private PostMountAlignmentState postMountAlignmentState;
+    private HorseRotationPhase horseRotationPhase = HorseRotationPhase.NONE;
+    private UUID horseRotationHorseId;
     private UUID announcedMountedHorseId;
     private UUID announcedApproachHorseId;
 
@@ -57,6 +60,10 @@ public final class AutomationController {
             return null;
         }
 
+        if (this.horseRotationPhase != HorseRotationPhase.NONE) {
+            return this.handleHorseRotation(minecraft, horseItemTracker);
+        }
+
         if (this.mountRetryCooldownTicks > 0) {
             this.mountRetryCooldownTicks--;
         }
@@ -75,6 +82,11 @@ public final class AutomationController {
             if (alignmentMessage != null) {
                 return alignmentMessage;
             }
+        }
+
+        Component rotationStartMessage = this.maybeBeginHorseRotation(minecraft, route, horseItemTracker);
+        if (rotationStartMessage != null) {
+            return rotationStartMessage;
         }
 
         NavigationController.NavigationOutcome outcome = this.navigationController.tick(minecraft, route);
@@ -211,6 +223,129 @@ public final class AutomationController {
         return Component.translatable("message.wynnhorse.horse_mount_attempt", horse.getDisplayName());
     }
 
+    private Component maybeBeginHorseRotation(
+            final Minecraft minecraft,
+            final WaypointRoute route,
+            final HorseItemTracker horseItemTracker
+    ) {
+        if (route.getActiveIndex() != 0) {
+            return null;
+        }
+
+        Waypoint firstWaypoint = route.getCurrentWaypoint().orElse(null);
+        if (firstWaypoint == null || minecraft.player == null) {
+            return null;
+        }
+
+        if (horizontalDistance(minecraft.player.position(), firstWaypoint.position()) > WynnHorseConfig.getWaypointReachedDistance()) {
+            return null;
+        }
+
+        horseItemTracker.refresh(minecraft);
+        if (!horseItemTracker.isMountedHorseMaxed()) {
+            return null;
+        }
+
+        if (!(minecraft.player.getVehicle() instanceof AbstractHorse riddenHorse)) {
+            return null;
+        }
+
+        this.horseRotationPhase = HorseRotationPhase.DISMOUNTING;
+        this.horseRotationHorseId = riddenHorse.getUUID();
+        this.horseSpawnController.reset();
+        this.awaitingPostMountAlignment = false;
+        this.postMountAlignmentState = null;
+        this.releaseMovement(minecraft);
+        LOGGER.info("Beginning horse rotation for maxed horse {} at first waypoint", riddenHorse.getUUID());
+        return Component.translatable("message.wynnhorse.horse_rotation_begin", riddenHorse.getDisplayName());
+    }
+
+    private Component handleHorseRotation(final Minecraft minecraft, final HorseItemTracker horseItemTracker) {
+        return switch (this.horseRotationPhase) {
+            case DISMOUNTING -> this.handleHorseDismount(minecraft);
+            case STORING -> this.handleHorseStore(minecraft, horseItemTracker);
+            case NONE -> null;
+        };
+    }
+
+    private Component handleHorseDismount(final Minecraft minecraft) {
+        this.releaseMovement(minecraft);
+        minecraft.options.keyShift.setDown(true);
+
+        if (minecraft.player != null && minecraft.player.getVehicle() instanceof AbstractHorse) {
+            return Component.translatable("message.wynnhorse.horse_rotation_dismounting");
+        }
+
+        minecraft.options.keyShift.setDown(false);
+        this.horseRotationPhase = HorseRotationPhase.STORING;
+        this.mountRetryCooldownTicks = 0;
+        LOGGER.info("Dismounted horse {}, beginning store step", this.horseRotationHorseId);
+        return Component.translatable("message.wynnhorse.horse_rotation_storing");
+    }
+
+    private Component handleHorseStore(final Minecraft minecraft, final HorseItemTracker horseItemTracker) {
+        this.releaseMovement(minecraft);
+        minecraft.options.keyShift.setDown(false);
+
+        if (minecraft.level == null || minecraft.player == null) {
+            return null;
+        }
+
+        AbstractHorse horse = this.resolveRotationHorse(minecraft);
+        if (horse == null) {
+            this.finishHorseRotation(horseItemTracker, "stored horse entity disappeared");
+            return Component.translatable("message.wynnhorse.horse_rotation_complete");
+        }
+
+        if (minecraft.gameMode == null) {
+            return Component.translatable("message.wynnhorse.horse_rotation_storing");
+        }
+
+        if (!horseItemTracker.selectMountedHorseItem(minecraft)) {
+            this.disable(minecraft, "unable to reselect mounted horse item for storage");
+            return Component.translatable("message.wynnhorse.automation.no_horse_item");
+        }
+
+        if (this.mountRetryCooldownTicks > 0) {
+            return null;
+        }
+
+        this.mountRetryCooldownTicks = WynnHorseConfig.getHorseMountRetryCooldownTicks();
+        InteractionResult result = minecraft.gameMode.interact(minecraft.player, horse, new EntityHitResult(horse), InteractionHand.MAIN_HAND);
+        if (result.consumesAction()) {
+            minecraft.player.swing(InteractionHand.MAIN_HAND);
+        }
+
+        LOGGER.info("Attempted to store horse {} with result {}", horse.getUUID(), result);
+        return Component.translatable("message.wynnhorse.horse_rotation_store_attempt", horse.getDisplayName());
+    }
+
+    private AbstractHorse resolveRotationHorse(final Minecraft minecraft) {
+        if (this.horseRotationHorseId == null || minecraft.level == null) {
+            return null;
+        }
+
+        if (minecraft.level.getEntity(this.horseRotationHorseId) instanceof AbstractHorse horse && horse.isAlive()) {
+            return horse;
+        }
+
+        return null;
+    }
+
+    private void finishHorseRotation(final HorseItemTracker horseItemTracker, final String reason) {
+        horseItemTracker.clearMountedHorseState();
+        this.horseSpawnController.reset();
+        this.mountRetryCooldownTicks = 0;
+        this.horseApproachPauseTicksRemaining = 0;
+        this.awaitingPostMountAlignment = false;
+        this.postMountAlignmentState = null;
+        this.horseRotationPhase = HorseRotationPhase.NONE;
+        this.horseRotationHorseId = null;
+        this.announcedMountedHorseId = null;
+        this.announcedApproachHorseId = null;
+        LOGGER.info("Finished horse rotation: {}", reason);
+    }
+
     private Component handlePostMountAlignment(final Minecraft minecraft, final WaypointRoute route) {
         if (minecraft.screen != null) {
             this.releaseMovement(minecraft);
@@ -337,6 +472,10 @@ public final class AutomationController {
         return Mth.clamp(pitch, -30.0F, 30.0F);
     }
 
+    private static double horizontalDistance(final Vec3 first, final Vec3 second) {
+        return Math.sqrt(Mth.lengthSquared(second.x - first.x, second.z - first.z));
+    }
+
     private float randomSignedPitchOffset() {
         double minimum = WynnHorseConfig.getHorsePostMountPitchJitterMinDegrees();
         double maximum = Math.max(minimum, WynnHorseConfig.getHorsePostMountPitchJitterMaxDegrees());
@@ -356,11 +495,14 @@ public final class AutomationController {
 
     private void enable() {
         this.enabled = true;
+        this.navigationController.reset();
         this.horseSpawnController.reset();
         this.mountRetryCooldownTicks = 0;
         this.horseApproachPauseTicksRemaining = 0;
         this.awaitingPostMountAlignment = false;
         this.postMountAlignmentState = null;
+        this.horseRotationPhase = HorseRotationPhase.NONE;
+        this.horseRotationHorseId = null;
         this.announcedMountedHorseId = null;
         this.announcedApproachHorseId = null;
         LOGGER.info("Automation enabled");
@@ -368,11 +510,14 @@ public final class AutomationController {
 
     private void disable(final Minecraft minecraft, final String reason) {
         this.enabled = false;
+        this.navigationController.reset();
         this.horseSpawnController.reset();
         this.mountRetryCooldownTicks = 0;
         this.horseApproachPauseTicksRemaining = 0;
         this.awaitingPostMountAlignment = false;
         this.postMountAlignmentState = null;
+        this.horseRotationPhase = HorseRotationPhase.NONE;
+        this.horseRotationHorseId = null;
         this.announcedMountedHorseId = null;
         this.announcedApproachHorseId = null;
         this.releaseMovement(minecraft);
@@ -400,6 +545,12 @@ public final class AutomationController {
     private enum PostMountAlignmentPhase {
         OVERSHOOT,
         CORRECTION
+    }
+
+    private enum HorseRotationPhase {
+        NONE,
+        DISMOUNTING,
+        STORING
     }
 
     private record PostMountAlignmentState(

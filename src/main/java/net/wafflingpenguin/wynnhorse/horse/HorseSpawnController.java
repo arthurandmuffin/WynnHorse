@@ -14,20 +14,20 @@ import net.wafflingpenguin.wynnhorse.WynnHorseConfig;
 import org.slf4j.Logger;
 
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 public final class HorseSpawnController {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private UUID targetHorseId;
-    private Set<UUID> knownNearbyHorseIds = Set.of();
+    private UUID startupClearHorseId;
     private int detectionTicksRemaining;
     private int retryDelayTicksRemaining;
+    private int startupClearRetryTicksRemaining;
     private boolean awaitingDetection;
+    private boolean startupHorseClearComplete;
     private String lastHorseScanDebugSummary = "";
 
     public HorseStepOutcome tick(final Minecraft minecraft, final HorseItemTracker horseItemTracker) {
@@ -38,7 +38,7 @@ public final class HorseSpawnController {
         if (minecraft.player.getVehicle() instanceof AbstractHorse riddenHorse) {
             this.targetHorseId = riddenHorse.getUUID();
             this.awaitingDetection = false;
-            this.knownNearbyHorseIds = Set.of();
+            this.startupHorseClearComplete = true;
             return HorseStepOutcome.mounted(riddenHorse);
         }
 
@@ -47,9 +47,11 @@ public final class HorseSpawnController {
             return HorseStepOutcome.readyToMount(resolvedTarget.get(), null);
         }
 
-        Optional<AbstractHorse> namedHorse = this.findNamedHorse(minecraft);
-        if (namedHorse.isPresent()) {
-            return this.reuseHorse(namedHorse.get(), "named");
+        if (!this.startupHorseClearComplete) {
+            HorseStepOutcome startupClearOutcome = this.handleStartupHorseClear(minecraft, horseItemTracker);
+            if (startupClearOutcome != null) {
+                return startupClearOutcome;
+            }
         }
 
         if (this.retryDelayTicksRemaining > 0) {
@@ -67,7 +69,6 @@ public final class HorseSpawnController {
                 return HorseStepOutcome.waiting(null);
             }
 
-            this.knownNearbyHorseIds = this.snapshotNearbyHorseIds(minecraft);
             this.awaitingDetection = true;
             this.detectionTicksRemaining = WynnHorseConfig.getHorseSpawnDetectionTimeoutTicks();
 
@@ -90,7 +91,6 @@ public final class HorseSpawnController {
             AbstractHorse horse = spawnedHorse.get();
             this.targetHorseId = horse.getUUID();
             this.awaitingDetection = false;
-            this.knownNearbyHorseIds = Set.of();
             LOGGER.info("Detected horse candidate {}", horse.getUUID());
             return HorseStepOutcome.readyToMount(horse, detectedHorseMessage(horse));
         }
@@ -98,7 +98,6 @@ public final class HorseSpawnController {
         this.detectionTicksRemaining--;
         if (this.detectionTicksRemaining <= 0) {
             this.awaitingDetection = false;
-            this.knownNearbyHorseIds = Set.of();
             this.retryDelayTicksRemaining = WynnHorseConfig.getHorseSpawnRetryDelayTicks();
             LOGGER.info("Horse detection timed out, retrying spawn loop");
             return HorseStepOutcome.waiting(Component.translatable("message.wynnhorse.horse_spawn_retry", expectedHorseName(minecraft)));
@@ -109,10 +108,12 @@ public final class HorseSpawnController {
 
     public void reset() {
         this.targetHorseId = null;
-        this.knownNearbyHorseIds = Set.of();
+        this.startupClearHorseId = null;
         this.detectionTicksRemaining = 0;
         this.retryDelayTicksRemaining = 0;
+        this.startupClearRetryTicksRemaining = 0;
         this.awaitingDetection = false;
+        this.startupHorseClearComplete = false;
         this.lastHorseScanDebugSummary = "";
     }
 
@@ -161,14 +162,6 @@ public final class HorseSpawnController {
 
     private Optional<AbstractHorse> findDetectedHorseCandidate(final Minecraft minecraft) {
         return this.findNamedHorse(minecraft);
-    }
-
-    private Set<UUID> snapshotNearbyHorseIds(final Minecraft minecraft) {
-        Set<UUID> horseIds = new HashSet<>();
-        for (AbstractHorse horse : this.findNearbyHorses(minecraft)) {
-            horseIds.add(horse.getUUID());
-        }
-        return horseIds;
     }
 
     private List<AbstractHorse> findNearbyHorses(final Minecraft minecraft) {
@@ -285,6 +278,62 @@ public final class HorseSpawnController {
         return Optional.of(displayName.substring(nameStart, secondMarker));
     }
 
+    private HorseStepOutcome handleStartupHorseClear(final Minecraft minecraft, final HorseItemTracker horseItemTracker) {
+        AbstractHorse nearbyHorse = this.resolveStartupClearHorse(minecraft);
+        if (nearbyHorse == null) {
+            this.startupHorseClearComplete = true;
+            this.startupClearHorseId = null;
+            return null;
+        }
+
+        if (minecraft.player == null || minecraft.gameMode == null) {
+            return HorseStepOutcome.waiting(Component.translatable("message.wynnhorse.horse_startup_clear_attempt", nearbyHorse.getDisplayName()));
+        }
+
+        if (this.startupClearRetryTicksRemaining > 0) {
+            this.startupClearRetryTicksRemaining--;
+            return HorseStepOutcome.waiting(null);
+        }
+
+        Optional<HorseItemMatch> preferredMatch = horseItemTracker.selectPreferredMatch(minecraft);
+        if (preferredMatch.isEmpty()) {
+            return HorseStepOutcome.noHorseItem(Component.translatable("message.wynnhorse.automation.no_horse_item"));
+        }
+
+        var result = minecraft.gameMode.interact(minecraft.player, nearbyHorse, new net.minecraft.world.phys.EntityHitResult(nearbyHorse), InteractionHand.MAIN_HAND);
+        if (result.consumesAction()) {
+            minecraft.player.swing(InteractionHand.MAIN_HAND);
+        }
+
+        this.startupClearRetryTicksRemaining = WynnHorseConfig.getHorseMountRetryCooldownTicks();
+        LOGGER.info("Attempted startup horse clear on {} with result {}", nearbyHorse.getUUID(), result);
+        return HorseStepOutcome.waiting(Component.translatable("message.wynnhorse.horse_startup_clear_attempt", nearbyHorse.getDisplayName()));
+    }
+
+    private AbstractHorse resolveStartupClearHorse(final Minecraft minecraft) {
+        if (minecraft.level == null) {
+            return null;
+        }
+
+        if (this.startupClearHorseId != null) {
+            Entity existing = minecraft.level.getEntity(this.startupClearHorseId);
+            if (existing instanceof AbstractHorse horse && horse.isAlive()) {
+                return horse;
+            }
+            this.startupClearHorseId = null;
+        }
+
+        List<AbstractHorse> nearbyHorses = this.findNearbyHorses(minecraft);
+        if (nearbyHorses.isEmpty()) {
+            return null;
+        }
+
+        AbstractHorse horse = nearbyHorses.getFirst();
+        this.startupClearHorseId = horse.getUUID();
+        LOGGER.info("Startup horse clear targeting nearby horse {}", horse.getUUID());
+        return horse;
+    }
+
     private boolean alignForHorseSpawn(final Minecraft minecraft) {
         if (minecraft.player == null) {
             return false;
@@ -317,14 +366,6 @@ public final class HorseSpawnController {
 
         LOGGER.info("Attempting horse spawn item use with generic item interaction");
         return minecraft.gameMode.useItem(minecraft.player, InteractionHand.MAIN_HAND);
-    }
-
-    private HorseStepOutcome reuseHorse(final AbstractHorse horse, final String reason) {
-        this.targetHorseId = horse.getUUID();
-        this.awaitingDetection = false;
-        this.knownNearbyHorseIds = Set.of();
-        LOGGER.info("Reusing {} horse {}", reason, horse.getUUID());
-        return HorseStepOutcome.readyToMount(horse, detectedHorseMessage(horse));
     }
 
     public record HorseStepOutcome(Status status, AbstractHorse horse, Component message) {

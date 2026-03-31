@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,16 +32,17 @@ public final class HorseItemTracker {
     private List<HorseItemMatch> matches = List.of();
     private Integer pendingMountedHorseSlot;
     private Integer activeMountedHorseSlot;
+    private long revision;
 
     public void refresh(final Minecraft minecraft) {
         if (minecraft.player == null || minecraft.level == null) {
-            this.matches = List.of();
+            this.clearMatches();
             return;
         }
 
         String query = WynnHorseConfig.getHorseItemDisplayName().trim();
         if (query.isEmpty()) {
-            this.matches = List.of();
+            this.clearMatches();
             return;
         }
 
@@ -65,10 +67,15 @@ public final class HorseItemTracker {
 
         refreshedMatches.sort(MATCH_ORDER);
         this.matches = List.copyOf(refreshedMatches);
+        this.revision++;
     }
 
     public List<HorseItemMatch> getMatches() {
         return this.matches;
+    }
+
+    public long getRevision() {
+        return this.revision;
     }
 
     public Optional<HorseItemMatch> getPreferredMatch() {
@@ -104,9 +111,48 @@ public final class HorseItemTracker {
         return this.activeMountedHorseSlot != null && this.activeMountedHorseSlot == slot;
     }
 
+    public Optional<HorseItemMatch> getMountedHorseMatch() {
+        if (this.activeMountedHorseSlot == null) {
+            return Optional.empty();
+        }
+
+        for (HorseItemMatch match : this.matches) {
+            if (match.slot() == this.activeMountedHorseSlot.intValue()) {
+                return Optional.of(match);
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    public boolean isMountedHorseMaxed() {
+        return this.getMountedHorseMatch().map(HorseItemMatch::isMaxedParsedStat).orElse(false);
+    }
+
+    public boolean selectMountedHorseItem(final Minecraft minecraft) {
+        this.refresh(minecraft);
+        if (minecraft.player == null || this.activeMountedHorseSlot == null) {
+            return false;
+        }
+
+        minecraft.player.getInventory().setSelectedSlot(this.activeMountedHorseSlot);
+        return true;
+    }
+
     public void clearMountedHorseState() {
         this.pendingMountedHorseSlot = null;
         this.activeMountedHorseSlot = null;
+    }
+
+    public OptionalInt getActiveMountedHorseSlot() {
+        return this.activeMountedHorseSlot == null ? OptionalInt.empty() : OptionalInt.of(this.activeMountedHorseSlot);
+    }
+
+    public void clearMatches() {
+        if (!this.matches.isEmpty()) {
+            this.matches = List.of();
+            this.revision++;
+        }
     }
 
     public boolean selectNonHorseItem(final Minecraft minecraft) {

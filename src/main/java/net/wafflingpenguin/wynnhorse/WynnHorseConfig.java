@@ -32,6 +32,54 @@ public final class WynnHorseConfig {
             .comment("Distance from a waypoint where steering may begin blending toward the next waypoint.")
             .defineInRange("waypointCornerRadius", 6.0D, 0.5D, 32.0D);
 
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_MIN_YAW_STEP_DEGREES = BUILDER
+            .comment("Minimum yaw change per tick used by dynamic waypoint steering for wide gentle turns.")
+            .defineInRange("dynamicTurnMinYawStepDegrees", 2.5D, 0.1D, 45.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_MAX_YAW_STEP_DEGREES = BUILDER
+            .comment("Maximum yaw change per tick used by dynamic waypoint steering for tight sharp turns.")
+            .defineInRange("dynamicTurnMaxYawStepDegrees", 7.5D, 0.1D, 90.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_MIN_START_DISTANCE = BUILDER
+            .comment("Minimum distance from the waypoint where dynamic steering may begin turning for sharp corners.")
+            .defineInRange("dynamicTurnMinStartDistance", 3.0D, 0.25D, 32.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_MAX_START_DISTANCE = BUILDER
+            .comment("Maximum distance from the waypoint where dynamic steering may begin turning for gentle corners.")
+            .defineInRange("dynamicTurnMaxStartDistance", 10.0D, 0.25D, 48.0D);
+
+    private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_NEXT_SEGMENT_LENGTH_CAP = BUILDER
+            .comment("Next-segment length that counts as fully long when computing dynamic turn-start distance and turn rate.")
+            .defineInRange("dynamicTurnNextSegmentLengthCap", 20.0D, 1.0D, 128.0D);
+
+    private static final ForgeConfigSpec.DoubleValue TRAVEL_DEFAULT_PITCH_DEGREES = BUILDER
+            .comment("Default pitch in degrees used during ordinary travel steering. Positive values look downward.")
+            .defineInRange("travelDefaultPitchDegrees", 17.5D, 0.0D, 45.0D);
+
+    private static final ForgeConfigSpec.DoubleValue TRAVEL_PITCH_PULL_STEP_DEGREES = BUILDER
+            .comment("Maximum pitch change per tick while gradually pulling the camera back toward the travel pitch target.")
+            .defineInRange("travelPitchPullStepDegrees", 0.9D, 0.05D, 10.0D);
+
+    private static final ForgeConfigSpec.DoubleValue TRAVEL_PITCH_RECOVERY_STEP_DEGREES = BUILDER
+            .comment("Maximum pitch change per tick while recovering back into the allowed travel pitch range after manual camera movement pushes it out of bounds.")
+            .defineInRange("travelPitchRecoveryStepDegrees", 3.5D, 0.1D, 20.0D);
+
+    private static final ForgeConfigSpec.DoubleValue TRAVEL_PITCH_JITTER_MIN_DEGREES = BUILDER
+            .comment("Minimum pitch deviation in degrees used for ordinary travel turn humanization.")
+            .defineInRange("travelPitchJitterMinDegrees", 0.75D, 0.0D, 10.0D);
+
+    private static final ForgeConfigSpec.DoubleValue TRAVEL_PITCH_JITTER_MAX_DEGREES = BUILDER
+            .comment("Maximum pitch deviation in degrees used for ordinary travel turn humanization.")
+            .defineInRange("travelPitchJitterMaxDegrees", 3.0D, 0.0D, 10.0D);
+
+    private static final ForgeConfigSpec.DoubleValue TRAVEL_PITCH_MAX_DEVIATION_DEGREES = BUILDER
+            .comment("Maximum absolute deviation from the default travel pitch used during ordinary steering.")
+            .defineInRange("travelPitchMaxDeviationDegrees", 10.0D, 0.0D, 25.0D);
+
+    private static final ForgeConfigSpec.IntValue TRAVEL_PITCH_RETARGET_INTERVAL_TICKS = BUILDER
+            .comment("Base tick interval used before choosing a new ordinary travel pitch target while steering.")
+            .defineInRange("travelPitchRetargetIntervalTicks", 8, 1, 80);
+
     private static final ForgeConfigSpec.DoubleValue HORSE_SPAWN_DETECTION_RADIUS = BUILDER
             .comment("Radius in blocks used to search for a newly spawned horse after using the selected horse item.")
             .defineInRange("horseSpawnDetectionRadius", 10.0D, 2.0D, 48.0D);
@@ -134,6 +182,18 @@ public final class WynnHorseConfig {
     public static double waypointReachedDistance = WAYPOINT_REACHED_DISTANCE.get();
     public static double steeringYawStepDegrees = STEERING_YAW_STEP_DEGREES.get();
     public static double waypointCornerRadius = WAYPOINT_CORNER_RADIUS.get();
+    public static double dynamicTurnMinYawStepDegrees = DYNAMIC_TURN_MIN_YAW_STEP_DEGREES.get();
+    public static double dynamicTurnMaxYawStepDegrees = DYNAMIC_TURN_MAX_YAW_STEP_DEGREES.get();
+    public static double dynamicTurnMinStartDistance = DYNAMIC_TURN_MIN_START_DISTANCE.get();
+    public static double dynamicTurnMaxStartDistance = DYNAMIC_TURN_MAX_START_DISTANCE.get();
+    public static double dynamicTurnNextSegmentLengthCap = DYNAMIC_TURN_NEXT_SEGMENT_LENGTH_CAP.get();
+    public static double travelDefaultPitchDegrees = TRAVEL_DEFAULT_PITCH_DEGREES.get();
+    public static double travelPitchPullStepDegrees = TRAVEL_PITCH_PULL_STEP_DEGREES.get();
+    public static double travelPitchRecoveryStepDegrees = TRAVEL_PITCH_RECOVERY_STEP_DEGREES.get();
+    public static double travelPitchJitterMinDegrees = TRAVEL_PITCH_JITTER_MIN_DEGREES.get();
+    public static double travelPitchJitterMaxDegrees = TRAVEL_PITCH_JITTER_MAX_DEGREES.get();
+    public static double travelPitchMaxDeviationDegrees = TRAVEL_PITCH_MAX_DEVIATION_DEGREES.get();
+    public static int travelPitchRetargetIntervalTicks = TRAVEL_PITCH_RETARGET_INTERVAL_TICKS.get();
     public static double horseSpawnDetectionRadius = HORSE_SPAWN_DETECTION_RADIUS.get();
     public static int horseSpawnDetectionTimeoutTicks = HORSE_SPAWN_DETECTION_TIMEOUT_TICKS.get();
     public static int horseSpawnRetryDelayTicks = HORSE_SPAWN_RETRY_DELAY_TICKS.get();
@@ -172,6 +232,18 @@ public final class WynnHorseConfig {
         waypointReachedDistance = WAYPOINT_REACHED_DISTANCE.get();
         steeringYawStepDegrees = STEERING_YAW_STEP_DEGREES.get();
         waypointCornerRadius = WAYPOINT_CORNER_RADIUS.get();
+        dynamicTurnMinYawStepDegrees = DYNAMIC_TURN_MIN_YAW_STEP_DEGREES.get();
+        dynamicTurnMaxYawStepDegrees = DYNAMIC_TURN_MAX_YAW_STEP_DEGREES.get();
+        dynamicTurnMinStartDistance = DYNAMIC_TURN_MIN_START_DISTANCE.get();
+        dynamicTurnMaxStartDistance = DYNAMIC_TURN_MAX_START_DISTANCE.get();
+        dynamicTurnNextSegmentLengthCap = DYNAMIC_TURN_NEXT_SEGMENT_LENGTH_CAP.get();
+        travelDefaultPitchDegrees = TRAVEL_DEFAULT_PITCH_DEGREES.get();
+        travelPitchPullStepDegrees = TRAVEL_PITCH_PULL_STEP_DEGREES.get();
+        travelPitchRecoveryStepDegrees = TRAVEL_PITCH_RECOVERY_STEP_DEGREES.get();
+        travelPitchJitterMinDegrees = TRAVEL_PITCH_JITTER_MIN_DEGREES.get();
+        travelPitchJitterMaxDegrees = TRAVEL_PITCH_JITTER_MAX_DEGREES.get();
+        travelPitchMaxDeviationDegrees = TRAVEL_PITCH_MAX_DEVIATION_DEGREES.get();
+        travelPitchRetargetIntervalTicks = TRAVEL_PITCH_RETARGET_INTERVAL_TICKS.get();
         horseSpawnDetectionRadius = HORSE_SPAWN_DETECTION_RADIUS.get();
         horseSpawnDetectionTimeoutTicks = HORSE_SPAWN_DETECTION_TIMEOUT_TICKS.get();
         horseSpawnRetryDelayTicks = HORSE_SPAWN_RETRY_DELAY_TICKS.get();
@@ -221,6 +293,54 @@ public final class WynnHorseConfig {
 
     public static double getWaypointCornerRadius() {
         return waypointCornerRadius;
+    }
+
+    public static double getDynamicTurnMinYawStepDegrees() {
+        return dynamicTurnMinYawStepDegrees;
+    }
+
+    public static double getDynamicTurnMaxYawStepDegrees() {
+        return dynamicTurnMaxYawStepDegrees;
+    }
+
+    public static double getDynamicTurnMinStartDistance() {
+        return dynamicTurnMinStartDistance;
+    }
+
+    public static double getDynamicTurnMaxStartDistance() {
+        return dynamicTurnMaxStartDistance;
+    }
+
+    public static double getDynamicTurnNextSegmentLengthCap() {
+        return dynamicTurnNextSegmentLengthCap;
+    }
+
+    public static double getTravelDefaultPitchDegrees() {
+        return travelDefaultPitchDegrees;
+    }
+
+    public static double getTravelPitchPullStepDegrees() {
+        return travelPitchPullStepDegrees;
+    }
+
+    public static double getTravelPitchRecoveryStepDegrees() {
+        return travelPitchRecoveryStepDegrees;
+    }
+
+    public static double getTravelPitchJitterMinDegrees() {
+        return travelPitchJitterMinDegrees;
+    }
+
+    public static double getTravelPitchJitterMaxDegrees() {
+        return travelPitchJitterMaxDegrees;
+    }
+
+    public static double getTravelPitchMaxDeviationDegrees() {
+        return travelPitchMaxDeviationDegrees;
+    }
+
+    public static int getTravelPitchRetargetIntervalTicks() {
+        return travelPitchRetargetIntervalTicks;
     }
 
     public static double getHorseSpawnDetectionRadius() {
