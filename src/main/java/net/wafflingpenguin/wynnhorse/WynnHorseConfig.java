@@ -38,7 +38,7 @@ public final class WynnHorseConfig {
 
     private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_MAX_YAW_STEP_DEGREES = BUILDER
             .comment("Maximum yaw change per tick used by dynamic waypoint steering for tight sharp turns.")
-            .defineInRange("dynamicTurnMaxYawStepDegrees", 7.5D, 0.1D, 90.0D);
+            .defineInRange("dynamicTurnMaxYawStepDegrees", 15.0D, 0.1D, 90.0D);
 
     private static final ForgeConfigSpec.DoubleValue DYNAMIC_TURN_MIN_START_DISTANCE = BUILDER
             .comment("Minimum distance from the waypoint where dynamic steering may begin turning for sharp corners.")

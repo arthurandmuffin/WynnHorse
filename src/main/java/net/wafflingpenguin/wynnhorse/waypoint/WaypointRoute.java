@@ -55,6 +55,17 @@ public final class WaypointRoute {
         return waypoint;
     }
 
+    public void clear() {
+        this.waypoints.clear();
+        this.activeIndex = -1;
+    }
+
+    public void replaceAll(final List<Waypoint> updatedWaypoints) {
+        this.waypoints.clear();
+        this.waypoints.addAll(updatedWaypoints);
+        this.activeIndex = this.waypoints.isEmpty() ? -1 : 0;
+    }
+
     public boolean removeWaypoint(final UUID waypointId) {
         int removedIndex = this.indexOf(waypointId);
         if (removedIndex == -1) {
